@@ -1,0 +1,36 @@
+from dataclasses import dataclass
+from datetime import datetime
+
+from shapely.geometry.base import BaseGeometry
+
+CellId = tuple[int, int]
+
+
+@dataclass(frozen=True)
+class Perimeter:
+    timestamp: datetime
+    geometry: BaseGeometry
+
+
+@dataclass(frozen=True)
+class MonitoringPoint:
+    id: CellId
+    x: float
+    y: float
+    risk: int
+    revisit_s: float
+
+
+@dataclass(frozen=True)
+class ChangeSet:
+    added: frozenset[CellId]
+    removed: frozenset[CellId]
+    changed: frozenset[CellId]
+
+    @property
+    def affected_current(self) -> frozenset[CellId]:
+        """C_t: new or altered current points; removed edges must be deleted."""
+        return self.added | self.changed
+
+    def fraction(self, previous: dict, current: dict) -> float:
+        return len(self.added | self.removed | self.changed) / max(1, len(previous.keys() | current.keys()))
