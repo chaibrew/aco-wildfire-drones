@@ -28,7 +28,25 @@ python -m pip install --no-deps -e .
 
 `requirements.lock` pins the versions used during setup. `pyproject.toml` contains the supported dependency ranges. GIS dependencies install from wheels on supported platforms. No separate QGIS application or fire-spread engine is needed.
 
-### Run real FEDS data
+### Continuous fire (FEDS + weather + terrain)
+
+FEDS only observes the fire every ~12 hours. `fire-sim fire` turns a FEDS sequence into a continuous fire: an arrival time for every 100 m cell, filled in between snapshots by shortest-time spread through a wind/slope rate field and paced hour by hour by fire weather. Every observed snapshot is reproduced exactly. Weather (Open-Meteo/ERA5) and elevation (Copernicus GLO-30) are downloaded once per fire into `data/cache/`. See [the model write-up and validation](docs/continuous-fire.md).
+
+```sh
+# Build, plot and animate 4 days of the Camp Fire; --validate adds the leave-one-out check.
+fire-sim fire data/raw/LargeFires_2018.gpkg --fire-id 3885 --year 2018 --limit 8 --gif --validate \
+  --output outputs/fire-3885
+
+# Real-time replay: replan every 600 s for 24 h on the active front, 6 drones, 1 km cells.
+fire-sim replay data/raw/LargeFires_2018.gpkg --fire-id 3885 --year 2018 --limit 8 \
+  --duration-h 24 --drones 6 --cell-size 1000 --output outputs/replay-3885
+```
+
+Useful options: `--seed` and `--noise` (different but snapshot-consistent runs), `--no-weather`, `--no-terrain`, `--pacing-exponent`, `--whole-perimeter` (monitor every edge cell, not just the active front), and `--rate-tiers LOW HIGH` (m/min thresholds for risk tiers 2 and 3).
+
+In replay, time is real seconds. Monitoring points are grid cells on the actively spreading front, with risk from the current spread rate. The change set C_t contains cells that were added or removed, or whose risk tier changed. [scripts/continuous_example.py](scripts/continuous_example.py) shows the planner hook.
+
+### Run real FEDS data (snapshot replay)
 
 ```sh
 # Downloads ~99 MB once, verifies checksum, extracts only the requested year.

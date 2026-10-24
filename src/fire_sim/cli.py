@@ -1,4 +1,4 @@
-"""Command-line setup, inspection, and reproducible simulation smoke runs."""
+"""Command-line setup, inspection, continuous fires and reproducible simulation runs."""
 
 import argparse
 import csv
@@ -6,6 +6,7 @@ import json
 import math
 import time
 from dataclasses import asdict
+from datetime import timedelta
 from pathlib import Path
 
 from shapely.geometry import mapping
@@ -132,6 +133,129 @@ def run(args):
                       "last_stage_metrics": rows[-1]}, indent=2))
 
 
+def _fire_options(p):
+    p.add_argument("path")
+    p.add_argument("--fire-id", required=True)
+    p.add_argument("--year", type=int)
+    p.add_argument("--limit", type=int, help="Use only the first N snapshots")
+    p.add_argument("--crs", help="Default: UTM estimated from first perimeter")
+    p.add_argument("--res", type=float, default=100.0, help="Fine raster cell size (m)")
+    p.add_argument("--seed", type=int, default=0, help="Spread heterogeneity seed")
+    p.add_argument("--noise", type=float, default=0.3, help="Log-normal heterogeneity sigma (0 = off)")
+    p.add_argument("--pacing-exponent", type=float, default=2.0, help="Growth weight = FFWI**p")
+    p.add_argument("--no-weather", action="store_true", help="Uniform pacing, no wind")
+    p.add_argument("--no-terrain", action="store_true", help="Flat ground")
+    p.add_argument("--time-convention", choices=["overpass", "label"], default="overpass")
+
+
+def _load_field(args):
+    from .fire import load_fire
+    from .spread import SpreadModel
+    return load_fire(args.path, fire_id=args.fire_id, year=args.year, limit=args.limit, crs=args.crs,
+                     res=args.res, seed=args.seed, model=SpreadModel(noise_sigma=args.noise),
+                     weather=not args.no_weather, terrain=not args.no_terrain,
+                     pacing_exponent=args.pacing_exponent, convention=args.time_convention)
+
+
+def _monitor(field, args):
+    from .monitor import FrontMonitor
+    return FrontMonitor(field, cell_size_m=args.cell_size, base_revisit_s=args.revisit,
+                        rate_tiers_mpm=tuple(args.rate_tiers), active_only=not args.whole_perimeter,
+                        active_window_s=None if args.active_window_h is None else args.active_window_h * 3600)
+
+
+def fire_command(args):
+    from . import plots
+    from .validation import leave_one_out, summarise
+    field, sequence = _load_field(args)
+    out = Path(args.output)
+    out.mkdir(parents=True, exist_ok=True)
+    field.save(out / "field")
+    monitor = _monitor(field, args)
+    plots.plot_fire(field, sequence, monitor, out / "fire.png")
+    if args.gif:
+        plots.animate(field, monitor, out / "fire.gif", step_s=args.gif_step_h * 3600)
+    report = {"output": str(out.resolve()), "raster": field.raster.shape, "snapshots": len(field.snapshot_s),
+              "hours": field.end_s / 3600, "intervals": field.meta["intervals"]}
+    if args.validate:
+        from .spread import SpreadModel
+        rows = leave_one_out(sequence, field.crs, res=args.res, model=SpreadModel(noise_sigma=0.0),
+                             weather=not args.no_weather, terrain=not args.no_terrain,
+                             pacing_exponent=args.pacing_exponent, convention=args.time_convention)
+        if rows:
+            with (out / "validation.csv").open("w", newline="") as stream:
+                writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
+                writer.writeheader()
+                writer.writerows(rows)
+        report["validation"] = summarise(rows)
+    print(json.dumps(report, indent=2, default=str))
+
+
+def replay_command(args):
+    from .grid import changes
+    from .plots import plot_replay
+    field, _ = _load_field(args)
+    monitor = _monitor(field, args)
+    start = field.start_s + args.start_h * 3600
+    stop = field.end_s if args.duration_h is None else min(field.end_s, start + args.duration_h * 3600)
+    if not field.start_s <= start < stop:
+        raise ValueError("start must lie inside the observed span")
+    first = field.perimeter(start)
+    xmin, ymin, _, _ = first.bounds  # depot from the fire at the start time only
+    depot = (xmin - args.cell_size, ymin - args.cell_size)
+    env = Environment([Drone(i, *depot) for i in range(args.drones)],
+                      speed_mps=args.speed, service_s=args.service)
+    env.time_s = start
+    rows, stages, previous = [], [], {}
+    stage = 0
+    while env.time_s + 1e-9 < stop:
+        t = env.time_s
+        horizon = min(args.horizon, stop - t)
+        points = monitor.points(t)
+        delta = changes(previous, points)
+        env.activate(points)
+        state = env.state(horizon)
+        started = time.perf_counter()
+        routes = smoke_router(state)
+        planning_s = time.perf_counter() - started
+        result = env.step(routes, horizon)
+        rows.append({"stage": stage, "time_s": t, "horizon_s": horizon,
+                     "utc": (field.t0 + timedelta(seconds=t)).isoformat(),
+                     "next_observation_s": field.next_snapshot(t), "active_points": len(points),
+                     "added": len(delta.added), "removed": len(delta.removed), "changed": len(delta.changed),
+                     "affected_current": len(delta.affected_current),
+                     "affected_union_fraction": delta.fraction(previous, points) if stage else 1.0,
+                     "planning_s": planning_s, **result.summary()})
+        stages.append({"stage": stage, "time_s": t, "horizon_s": horizon,
+                       "points": [{**asdict(p), "last_seen_s": state.last_seen[i]} for i, p in points.items()],
+                       "drones": [asdict(d) for d in state.drones],
+                       "changes": {"added": sorted(delta.added), "removed": sorted(delta.removed),
+                                   "changed": sorted(delta.changed)},
+                       "routes": {str(i): r for i, r in routes.items()}})
+        previous, stage = points, stage + 1
+    out = Path(args.output)
+    out.mkdir(parents=True, exist_ok=True)
+    with (out / "metrics.csv").open("w", newline="") as stream:
+        writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+    payload = {"schema_version": 2, "units": {"distance": "metres", "time": "seconds after first snapshot"},
+               "fire": {"t0_utc": field.t0.isoformat(), "snapshot_s": list(field.snapshot_s),
+                        "meta": field.meta}, "config": vars(args),
+               "priority_model": "risk tier from current front spread rate; q = base_revisit / risk",
+               "change_rule": "added/removed cells, or surviving cells whose risk tier changed",
+               "router": "smoke_router (not a validated experimental baseline)", "stages": stages}
+    (out / "scenario.json").write_text(json.dumps(payload, indent=1, default=str, allow_nan=False) + "\n")
+    plot_replay(rows, out / "replay.png")
+    fractions = [r["affected_union_fraction"] for r in rows[1:]]
+    print(json.dumps({"output": str(out.resolve()), "stages": len(rows),
+                      "points_min_median_max": [min(r["active_points"] for r in rows),
+                                                sorted(r["active_points"] for r in rows)[len(rows) // 2],
+                                                max(r["active_points"] for r in rows)],
+                      "changed_fraction_median": sorted(fractions)[len(fractions) // 2] if fractions else None,
+                      "worst_objective": max(r["objective"] for r in rows)}, indent=2))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -160,10 +284,36 @@ def main():
         p.add_argument("--locality", choices=["local", "distributed"], default="local")
         p.add_argument("--radius", type=float, default=400.0, help="Growth patch radius in metres")
         p.add_argument("--patches", type=int, default=4)
+    for name in ("fire", "replay"):
+        p = sub.add_parser(name, help={"fire": "Build a continuous fire from FEDS + weather + terrain",
+                                       "replay": "Replan drones every horizon on a continuous fire"}[name])
+        _fire_options(p)
+        p.add_argument("--output", default=f"outputs/{name}")
+        p.add_argument("--cell-size", type=float, default=500.0, help="Monitoring grid cell (m)")
+        p.add_argument("--revisit", type=float, default=900.0, help="Base q (s); q = base / risk")
+        p.add_argument("--rate-tiers", type=float, nargs=2, default=[2.0, 10.0], metavar=("LOW", "HIGH"),
+                       help="Front spread rate (m/min) for risk 2 and risk 3")
+        p.add_argument("--whole-perimeter", action="store_true", help="Monitor every perimeter cell, not just the active front")
+        p.add_argument("--active-window-h", type=float, help="Active if fire reaches a neighbour within this many hours (default: before next observation)")
+        if name == "fire":
+            p.add_argument("--validate", action="store_true", help="Leave-one-snapshot-out check")
+            p.add_argument("--gif", action="store_true")
+            p.add_argument("--gif-step-h", type=float, default=0.5)
+        else:
+            p.add_argument("--start-h", type=float, default=0.0, help="Hours after first snapshot")
+            p.add_argument("--duration-h", type=float, help="Default: until last snapshot")
+            p.add_argument("--horizon", type=float, default=600.0, help="Replanning interval (s)")
+            p.add_argument("--drones", type=int, default=3)
+            p.add_argument("--speed", type=float, default=15.0, help="Metres per second")
+            p.add_argument("--service", type=float, default=5.0, help="Seconds per observation")
     args = parser.parse_args()
     try:
         if args.command == "inspect":
             print(json.dumps(inspect_file(args.path), indent=2, default=str))
+        elif args.command == "fire":
+            fire_command(args)
+        elif args.command == "replay":
+            replay_command(args)
         else:
             run(args)
     except ValueError as error:
