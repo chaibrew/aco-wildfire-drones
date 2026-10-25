@@ -16,7 +16,7 @@ FEDS GeoPackage
 
 ## FEDS loader
 
-`load_feds` returns a list of `Perimeter(timestamp, geometry)` and provenance data.
+`load_feds` returns a list of `Perimeter(timestamp, geometry)` and provenance data. Provenance data records where the data came from. Another person can use it to repeat a run. It contains the source file and its SHA-256 checksum, the source and target CRS, the fire ID and year, the number of geometry repairs and the number of joined duplicate records. `fire-sim` writes it into `field.json` and `config.json`.
 
 - It keeps polygon parts and holes.
 - It joins duplicate records at one timestamp and records the number.

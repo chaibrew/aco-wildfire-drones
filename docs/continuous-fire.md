@@ -22,9 +22,12 @@ T(x) = t_k + pace_k^{-1}( tau_f(x) / (tau_f(x) + tau_b(x)) )
 This is a constrained form of two published methods:
 
 - Minimum travel time (Finney 2002): fire arrival time is the shortest travel time through a directional spread-rate grid. FlamMap uses this method.
-- Arrival time between two perimeters (Farguell et al. 2018): the arrival time agrees with each observed perimeter and approximately satisfies |∇T| = 1/R. Farguell et al. minimise the residual numerically. This project uses the ratio of two travel times. The ratio satisfies the perimeters exactly and does not need an optimiser.
+- Arrival time between two perimeters (Farguell et al. 2018): the arrival time must agree with both perimeters. Farguell et al. use a numerical optimiser. This project uses a ratio of two travel times. The ratio agrees with both perimeters exactly.
 
-The travel times come from Dijkstra on a 100 m raster with 16 neighbours. Fire travels only through the cells that burn in the interval. Fire cannot cross ground that burned before. The first and the last half cell use the distance to the true polygon edge.
+The area is a grid of 100 m cells. Dijkstra's algorithm finds the fastest path for the fire from cell to cell. From a cell, the fire can move to 16 neighbours: 4 sides, 4 corners and 8 knight moves.
+
+- The fire moves only through the cells that burn in this interval. It cannot go back through ground that burned before.
+- A perimeter line does not follow the cell edges. Thus the first and the last step of a path use the real distance from the cell centre to the perimeter line, not a full cell.
 
 ### Spread rate
 
