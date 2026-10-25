@@ -19,6 +19,11 @@ T(x) = t_k + pace_k^{-1}( tau_f(x) / (tau_f(x) + tau_b(x)) )
 - `tau_f(x)`: the shortest travel time from the edge of A_k to x.
 - `tau_b(x)`: the shortest travel time from x to the edge of A_{k+1}.
 
+This is a constrained form of two published methods:
+
+- Minimum travel time (Finney 2002): fire arrival time is the shortest travel time through a directional spread-rate grid. FlamMap uses this method.
+- Arrival time between two perimeters (Farguell et al. 2018): the arrival time agrees with each observed perimeter and approximately satisfies |∇T| = 1/R. Farguell et al. minimise the residual numerically. This project uses the ratio of two travel times. The ratio satisfies the perimeters exactly and does not need an optimiser.
+
 The travel times come from Dijkstra on a 100 m raster with 16 neighbours. Fire travels only through the cells that burn in the interval. Fire cannot cross ground that burned before. The first and the last half cell use the distance to the true polygon edge.
 
 ### Spread rate
@@ -33,7 +38,7 @@ The cost of a step is length divided by rate. The rate has three parts:
 
 ### Pacing
 
-`pace_k` changes the fraction of the spread into clock time. It uses the cumulative sum of `FFWI^p + 1`. FFWI is the Fosberg Fire Weather Index (Fosberg 1978). The simulation calculates FFWI each hour from the temperature, humidity and wind at the fire centre (Open-Meteo, ERA5). The default p is 2.
+`pace_k` changes the fraction of the spread into clock time. It uses the cumulative sum of `FFWI + 1`. FFWI is the Fosberg Fire Weather Index (Fosberg 1978). The simulation calculates FFWI each hour from the temperature, humidity and wind at the fire centre (Open-Meteo, ERA5).
 
 The wind for the ellipse is the mean wind vector in the interval. FFWI gives the weight of each hour. When the wind direction changes, the mean vector decreases and the fire becomes more round.
 
@@ -65,7 +70,7 @@ The arrival-time fire is the ground truth. The planner never sees it. `run_missi
 
 The fleet map is the only input to the planner.
 
-- **FEDS snapshot:** the map receives the true burned area at the snapshot time. An optional delay is available.
+- **FEDS snapshot:** at the snapshot time, the map receives the true burned area.
 - **Drone observation:** when an observation completes at (x, y, t), the map receives the true burned state in the sensor radius R at time t. The default R is the cell size.
 - **Unobserved ground:** the map keeps the last observed state. If the fire moves out of the sensor radius, the map shows the fire only to the edge of the radius. The drones must follow the front. The map does not show a spot fire until a drone or the next snapshot finds it.
 - **Monitoring points:** all grid cells on the mapped perimeter.
@@ -103,8 +108,8 @@ The first snapshot has no previous snapshot. Thus, if the mission starts at the 
 
 Camp Fire, 24 h, 6 drones, 1 km cells, `smoke_router`:
 
-- Each 10-minute replan changes a median of 6% of the points. Drone observations cause these changes.
-- A new snapshot changes 80% of the points.
+- Each 10-minute replan changes a median of 8% of the points. Drone observations cause these changes.
+- A new snapshot changes 79% of the points.
 - `front_on_map_fraction` decreases to approximately 0.8 before a snapshot. After the snapshot, it is 1.
 
 ## 3. Validation: leave one snapshot out
@@ -113,26 +118,33 @@ Remove snapshot k. Interpolate the 24 h interval from k−1 to k+1. Compare the 
 
 - **IoU:** overlap of the calculated growth and the observed growth (1 is perfect).
 - **Frac err:** error in the fraction of the 24 h growth that is complete at t_k.
-- **Physics:** wind, slope and FFWI² pacing. No random variation.
+- **Physics:** wind, slope and FFWI pacing. No random variation.
 - **Plain:** straight-line distance and constant pacing.
 
 | Fire (2018) | Area km² | Intervals | IoU physics | IoU plain | Frac err physics | Frac err plain |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| 3885 (Camp) | 618 | 14 | **0.494** | 0.429 | 0.311 | 0.298 |
-| 2519 | 193 | 37 | **0.427** | 0.375 | **0.233** | 0.354 |
-| 2502 | 463 | 28 | **0.389** | 0.353 | **0.261** | 0.304 |
-| 2644 | 50 | 34 | 0.395 | 0.407 | 0.345 | 0.311 |
-| 3616 | 34 | 28 | 0.299 | 0.337 | 0.416 | 0.319 |
-| 67 | 19 | 7 | 0.095 | 0.132 | 0.482 | 0.482 |
+| 3885 (Camp) | 618 | 14 | **0.472** | 0.429 | 0.300 | 0.298 |
+| 2519 | 193 | 37 | **0.411** | 0.375 | **0.283** | 0.354 |
+| 2502 | 463 | 28 | **0.380** | 0.353 | **0.284** | 0.304 |
+| 2644 | 50 | 34 | 0.401 | 0.407 | 0.339 | 0.311 |
+| 3616 | 34 | 28 | 0.312 | 0.337 | 0.378 | 0.319 |
+| 67 | 19 | 7 | 0.099 | 0.132 | 0.489 | 0.482 |
 
 Results:
 
 - Physics is better on the large, wind-driven fires. It is slightly worse on the small fires.
 - Most of the improvement comes from the weather pacing. Wind shape and slope each change IoU by approximately 0.02.
-- p = 3 is better on large fires and worse on small fires. Thus the default is p = 2.
 - No method recovers the 12-hour growth accurately (IoU 0.3 to 0.5). The simulation needs only a possible fire between snapshots. It always agrees with the snapshots.
 
 To repeat the check, use `fire-sim fire ... --validate`. The result is in `validation.csv`.
+
+## References
+
+- Anderson, H. E. (1983). Predicting wind-driven wild land fire size and shape. USDA Forest Service Research Paper INT-305.
+- Farguell Caus, A., Haley, J., Kochanski, A. K., Cortés Fité, A., Mandel, J. (2018). Assimilation of fire perimeters and satellite detections by minimization of the residual in a fire spread model. ICCS 2018. arXiv:1804.03995.
+- Finney, M. A. (2002). Fire growth using minimum travel time methods. Canadian Journal of Forest Research, 32(8), 1420–1424.
+- Fosberg, M. A. (1978). Weather in wildland fire management: the fire weather index. Proceedings of the Conference on Sierra Nevada Meteorology.
+- Rothermel, R. C. (1972). A mathematical model for predicting fire spread in wildland fuels. USDA Forest Service Research Paper INT-115.
 
 ## Limits
 

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from .firemap import FireMap
-from .grid import changes
+from .models import changes
 from .monitor import FrontMonitor
 from .simulation import Drone, Environment, gap_metrics
 
@@ -16,7 +16,6 @@ class MissionConfig:
     sensor_radius_m: float | None = None
     base_revisit_s: float = 900.0
     rate_tiers_mpm: tuple[float, float] = (2.0, 10.0)
-    snapshot_latency_s: float = 0.0
     drones: int = 3
     speed_mps: float = 15.0
     service_s: float = 5.0
@@ -56,10 +55,9 @@ def run_mission(field, router, config=MissionConfig(), *, start_s=None, stop_s=N
     stop = field.end_s if stop_s is None else min(stop_s, field.end_s)
     if not field.start_s <= start < stop:
         raise ValueError("start must lie inside the observed span")
-    latency = config.snapshot_latency_s
     fire_map = FireMap(field, cell_size_m=config.cell_size_m, sensor_radius_m=config.radius,
                        base_revisit_s=config.base_revisit_s, rate_tiers_mpm=config.rate_tiers_mpm)
-    available = [k for k, s in enumerate(field.snapshot_s) if s + latency <= start]
+    available = [k for k, s in enumerate(field.snapshot_s) if s <= start]
     if not available:
         raise ValueError("No snapshot is available at the start time")
     for k in available:
@@ -77,7 +75,7 @@ def run_mission(field, router, config=MissionConfig(), *, start_s=None, stop_s=N
         horizon = min(config.horizon_s, stop - t)
         delivered = []
         for k, s in enumerate(field.snapshot_s):
-            if k not in fire_map.snapshots_ingested and s + latency <= t:
+            if k not in fire_map.snapshots_ingested and s <= t:
                 fire_map.ingest_snapshot(k)
                 delivered.append(k)
         points = fire_map.points()

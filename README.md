@@ -1,6 +1,6 @@
 # aco-wildfire-drones
 
-ACO routing for wildfire-monitoring drones (COMP3821). The project compares pheromone strategies when the fire perimeter changes.
+ACO routing for wildfire-monitoring drones (COMP3821). This project compares different pheromone strategies when the fire perimeter changes.
 
 ## Setup
 
@@ -14,8 +14,6 @@ python -m pip install --no-deps -e .
 pytest -q
 ```
 
-`requirements.lock` has the exact versions. `pyproject.toml` has the permitted version ranges.
-
 ## Data
 
 ```sh
@@ -23,13 +21,11 @@ python scripts/fetch_feds.py --year 2018
 fire-sim inspect data/raw/LargeFires_2018.gpkg
 ```
 
-The download script gets the FEDS archive (approximately 99 MB) one time, verifies the checksum, and extracts one year. `inspect` shows the layers, the fire IDs and the number of snapshots for each fire.
-
 ## Ground-truth fire
 
-FEDS gives one perimeter for a fire approximately each 12 hours. `fire-sim fire` makes a continuous fire from these perimeters. The result is an arrival time for each 100 m cell.
+FEDS tracks fire perimeters at 12 hour intervals. `fire-sim fire` makes a continuous fire by interpolating between 2 12-hour timestamp pairs with augmentation with weather/terrain data to try to make it somewhat realistic.
 
-- At each FEDS observation time, the fire agrees with the FEDS perimeter.
+- At each FEDS observation time, the fire perimeter is exactly the same as the FEDS perimeter.
 - Between observations, wind, slope and hourly fire weather control the spread.
 - The command downloads weather (Open-Meteo, ERA5) and elevation (Copernicus GLO-30) one time for each fire. It keeps them in `data/cache/`.
 
@@ -40,18 +36,17 @@ fire-sim fire data/raw/LargeFires_2018.gpkg --fire-id 3885 --year 2018 --limit 8
 
 | Option | Function |
 | --- | --- |
-| `--seed`, `--noise` | Change the random spread variation. All seeds agree with the FEDS perimeters. |
+| `--seed`, `--noise` | Change the random spread variation. |
 | `--no-weather`, `--no-terrain` | Remove weather or slope from the spread. |
-| `--pacing-exponent` | Set how strongly fire weather controls the hourly growth. Default 2. |
-| `--validate` | Do the leave-one-snapshot-out check. |
+| `--validate` | Do a leave-one-snapshot-out check. |
 
 Output: `field.npz` and `field.json` (the fire), `fire.png`, `fire.gif` (with `--gif`), `validation.csv` (with `--validate`).
 
 ## Drone mission
 
-`fire-sim mission` flies drones above the ground-truth fire. The planner does not see the ground truth. The planner sees only the fleet map:
+`fire-sim mission` flies drones above the ground-truth fire. The planner does not see the ground truth. The planner sees:
 
-- The most recent FEDS perimeter. A new perimeter arrives each 12 hours, with an optional delay.
+- The most recent FEDS perimeter. A new perimeter arrives each 12 hours.
 - Drone observations. When a drone completes an observation, it sees the true fire in its sensor radius.
 
 The monitoring points are the grid cells on the mapped perimeter. The risk of a point comes from the observed spread rate. For each stage, the mission calculates J two times: on the fleet map and on the true active front.
@@ -65,7 +60,6 @@ fire-sim mission data/raw/LargeFires_2018.gpkg --fire-id 3885 --year 2018 --limi
 | --- | --- | --- |
 | `--cell-size` | Monitoring grid cell (m) | 500 |
 | `--sensor-radius` | Drone sensor radius (m) | cell size |
-| `--snapshot-latency-h` | Delay before a FEDS perimeter arrives (h) | 0 |
 | `--rate-tiers LOW HIGH` | Spread rate (m/min) for risk 2 and risk 3 | 2 10 |
 | `--revisit` | Base revisit period q (s). q = base / risk. | 900 |
 | `--horizon` | Time between replans (s) | 600 |
@@ -82,17 +76,6 @@ A planner is a function. It receives a `PlanningState` and returns `{drone_id: [
 ## Model details
 
 Refer to [docs/continuous-fire.md](docs/continuous-fire.md).
-
-## Legacy snapshot replay
-
-`fire-sim demo` and `fire-sim feds` replay the FEDS perimeters without interpolation. They compress time (default 72 times). The planner sees each perimeter directly. These commands do not agree with the mission model. They contain the controlled-growth tool:
-
-```sh
-fire-sim demo --static --steps 6 --perturb-stage 2 --locality local --radius 400 --patches 4 \
-  --seed 42 --output outputs/local-change
-```
-
-`--locality local` adds growth patches on a short part of the boundary. `--locality distributed` adds them along all of the boundary. The radius and the number of patches control the geometry, not the fraction of changed points. Read the fraction in `metrics.csv` (`affected_union_fraction`).
 
 ## Data sources
 

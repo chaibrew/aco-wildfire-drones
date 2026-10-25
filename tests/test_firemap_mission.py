@@ -90,13 +90,6 @@ def test_planner_never_sees_truth_between_snapshots(field):
     assert [r["snapshot_delivered"] for r in rows if r["snapshot_delivered"]] == ["1"]
 
 
-def test_snapshot_latency_delays_delivery(field):
-    config = MissionConfig(cell_size_m=500, horizon_s=3600, drones=1, snapshot_latency_s=3 * 3600)
-    rows = run_mission(field, lambda s: {d.id: [] for d in s.drones}, config, start_s=4 * 3600)
-    delivered = [r["time_s"] for r in rows if r["snapshot_delivered"]]
-    assert delivered == [DAY + 3 * 3600]
-
-
 def test_mission_rows_and_truth_scoring(field):
     from fire_sim.simulation import smoke_router
     rows = run_mission(field, smoke_router, MissionConfig(cell_size_m=500, drones=2), stop_s=6 * 3600)
@@ -104,4 +97,4 @@ def test_mission_rows_and_truth_scoring(field):
     assert all(r["visits"] > 0 for r in rows)
     assert all(0 <= r["front_on_map_fraction"] <= 1 for r in rows)
     with pytest.raises(ValueError):
-        run_mission(field, smoke_router, MissionConfig(snapshot_latency_s=DAY), start_s=0)
+        run_mission(field, smoke_router, MissionConfig(), start_s=3 * DAY)

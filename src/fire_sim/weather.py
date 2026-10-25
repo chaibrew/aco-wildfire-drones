@@ -56,10 +56,9 @@ class Weather:
     wind_mps: np.ndarray
     wind_from_deg: np.ndarray
     floor: float = 1.0
-    exponent: float = 1.0
 
     @classmethod
-    def from_open_meteo(cls, payload, t0, floor=1.0, exponent=1.0):
+    def from_open_meteo(cls, payload, t0, floor=1.0):
         hourly = payload["hourly"]
         stamps = [datetime.fromisoformat(s).replace(tzinfo=timezone.utc) for s in hourly["time"]]
         values = {k: np.array([np.nan if v is None else v for v in hourly[k]], dtype=float) for k in VARIABLES}
@@ -68,7 +67,7 @@ class Weather:
         values = {k: _fill(v) for k, v in values.items()}
         return cls(t0, np.array([(s - t0).total_seconds() for s in stamps]),
                    values["temperature_2m"], values["relative_humidity_2m"],
-                   values["wind_speed_10m"], values["wind_direction_10m"], floor, exponent)
+                   values["wind_speed_10m"], values["wind_direction_10m"], floor)
 
     @property
     def index(self):
@@ -80,7 +79,7 @@ class Weather:
         inside = self.times_s[(self.times_s > start_s) & (self.times_s < end_s)]
         clock = np.unique(np.concatenate([[start_s, end_s], inside,
                                           np.linspace(start_s, end_s, samples)]))
-        weight = np.interp(clock, self.times_s, self.index) ** self.exponent + self.floor
+        weight = np.interp(clock, self.times_s, self.index) + self.floor
         cumulative = np.concatenate([[0], np.cumsum(np.diff(clock) * (weight[1:] + weight[:-1]) / 2)])
         fraction = cumulative / cumulative[-1]
         rad = np.radians(self.wind_from_deg)

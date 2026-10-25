@@ -20,7 +20,7 @@ FEDS GeoPackage
 
 - It keeps polygon parts and holes.
 - It joins duplicate records at one timestamp and records the number.
-- A missing ID, missing CRS, non-polygon geometry, missing time or invalid geometry causes an error. Use `--repair` to repair invalid geometry. The provenance records the number of repairs.
+- A missing ID, missing CRS, non-polygon geometry or missing time causes an error. `fire-sim` repairs invalid geometry. The provenance records the number of repairs.
 - If a fire ID occurs in more than one year, you must give the year.
 - It uses one FEDS fire ID. It does not join IDs when fires merge.
 - It selects the projection from the first perimeter only.
@@ -41,8 +41,6 @@ FEDS GeoPackage
 - `affected_current = added | changed`: C_t for selective reset.
 
 `fraction` is `|added ∪ removed ∪ changed| / |previous ∪ current|`. The first activation has fraction 1. It is not an adaptation event. If a change has only removed points, C_t is empty. You must still delete the edges of the removed points.
-
-The legacy commands use `perimeter_changes`. It also marks a cell as changed when the boundary in the cell changes.
 
 ## Planner contract
 
@@ -89,6 +87,3 @@ For a point in stage [t, t+H], make this list of times:
 - `overdue_count` counts the points with `P_i > q_i` in the stage.
 - Route distance starts at the current position. It does not contain observation time or a return to base.
 
-## Legacy commands
-
-`fire-sim demo` and `fire-sim feds` keep each FEDS perimeter constant until the next one. They divide time by `--time-scale` (default 72). Speed and revisit periods do not change with the time scale. Risk is a fixed hash of `(seed, cell_id)`. These commands do not use the fleet map.

@@ -38,13 +38,12 @@ def test_drivers_wind_direction_and_pacing():
     assert d.pace_times_s[0] == 3600 and d.pace_times_s[-1] == 3600 + DAY
 
 
-def test_pacing_follows_fire_weather_and_exponent():
+def test_pacing_follows_fire_weather():
     speed = [1.0] * 6 + [12.0] * 6 + [1.0] * 36
-    for exponent, minimum in ((1.0, 0.5), (3.0, 0.9)):
-        weather = Weather.from_open_meteo(payload(speed=speed), T0, exponent=exponent)
-        d = weather.drivers(0, DAY)
-        share = np.interp(12 * 3600, d.pace_times_s, d.pace_fraction) - np.interp(5 * 3600, d.pace_times_s, d.pace_fraction)
-        assert share > minimum
+    weather = Weather.from_open_meteo(payload(speed=speed), T0)
+    d = weather.drivers(0, DAY)
+    share = np.interp(12 * 3600, d.pace_times_s, d.pace_fraction) - np.interp(5 * 3600, d.pace_times_s, d.pace_fraction)
+    assert share > 0.5
 
 
 def test_drivers_require_coverage():

@@ -39,7 +39,7 @@ class Inputs:
 
 
 def prepare_inputs(sequence, crs, *, res=100.0, pad=2000.0, weather=True, terrain=True,
-                   convention="overpass", pacing_exponent=1.0, cache_dir="data/cache"):
+                   convention="overpass", cache_dir="data/cache"):
     if len(sequence) < 2:
         raise ValueError("Need at least two snapshots to interpolate")
     centre = sequence[0].geometry.centroid
@@ -52,7 +52,7 @@ def prepare_inputs(sequence, crs, *, res=100.0, pad=2000.0, weather=True, terrai
         inputs.elevation = fetch_elevation(raster, crs, Path(cache_dir) / "dem")
     if weather:
         payload = fetch_hourly(lat, lon, stamps[0].date(), stamps[-1].date(), Path(cache_dir) / "weather")
-        inputs.weather = Weather.from_open_meteo(payload, stamps[0], exponent=pacing_exponent)
+        inputs.weather = Weather.from_open_meteo(payload, stamps[0])
     return inputs
 
 
@@ -62,8 +62,7 @@ def build_field(sequence, crs, *, seed=0, model=SpreadModel(), provenance=None, 
                                        model=model, drivers=inputs.drivers(range(len(sequence))),
                                        elevation=inputs.elevation, seed=seed)
     weather_meta = ({"source": "Open-Meteo archive (ERA5), hourly, single point at first-perimeter centroid",
-                     "pacing": "cumulative FFWI**exponent + floor", "floor": inputs.weather.floor,
-                     "exponent": inputs.weather.exponent}
+                     "pacing": "cumulative FFWI + floor", "floor": inputs.weather.floor}
                     if inputs.weather is not None else {"source": "none: uniform pacing, isotropic spread"})
     meta = {"provenance": provenance or {}, "centroid_lonlat": list(inputs.lonlat), "seed": seed,
             "model": asdict(model), "time_convention": input_options.get("convention", "overpass"),
