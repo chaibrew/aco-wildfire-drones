@@ -35,8 +35,7 @@ class ChangeSet:
         return len(self.added | self.removed | self.changed) / max(1, len(previous.keys() | current.keys()))
 
 
-def changes(previous, current, *, geometry_changed=()):
+def changes(previous, current):
     old, new = previous.keys(), current.keys()
     altered = {i for i in old & new if previous[i] != current[i]}
-    altered.update(set(geometry_changed) & old & new)
     return ChangeSet(frozenset(new - old), frozenset(old - new), frozenset(altered))

@@ -1,89 +1,176 @@
 # Simulation contract
 
-These rules apply to all planners. The group must agree on them before the experiments.
+All planners use this interface. Units: metres and seconds. Coordinates: the projected CRS of the fire (UTM).
 
 ## Data flow
 
 ```text
-FEDS GeoPackage
-  -> perimeters in one metric CRS (load_feds)
-  -> ground-truth arrival-time fire (ArrivalField)
-  -> fleet map from snapshots and drone observations (FireMap)
-  -> PlanningState -> planner -> routes
-  -> evaluate -> Environment.step
-  -> drone observations update the fleet map
+load_feds -> load_fire -> ArrivalField (hidden ground truth)
+                              |
+FEDS snapshots + drone observations -> FireMap -> PlanningState -> router -> Routes
+                                                                               |
+                                    FireMap.observe <- visits <- Environment.step
 ```
 
-## FEDS loader
+## Types
 
-`load_feds` returns a list of `Perimeter(timestamp, geometry)` and provenance data. Provenance data records where the data came from. Another person can use it to repeat a run. It contains the source file and its SHA-256 checksum, the source and target CRS, the fire ID and year, the number of geometry repairs and the number of joined duplicate records. `fire-sim` writes it into `field.json` and `config.json`.
+```python
+CellId = tuple[int, int]                 # (floor(x / cell_size_m), floor(y / cell_size_m)), origin (0, 0)
+Routes = dict[int, list[CellId]]         # drone id -> ordered point IDs
 
-- It keeps polygon parts and holes.
-- It joins duplicate records at one timestamp and records the number.
-- A missing ID, missing CRS, non-polygon geometry or missing time causes an error. `fire-sim` repairs invalid geometry. The provenance records the number of repairs.
-- If a fire ID occurs in more than one year, you must give the year.
-- It uses one FEDS fire ID. It does not join IDs when fires merge.
-- It selects the projection from the first perimeter only.
+@dataclass(frozen=True)
+class MonitoringPoint:
+    id: CellId
+    x: float                             # cell centre (m)
+    y: float
+    risk: int                            # 1, 2 or 3
+    revisit_s: float                     # q = base_revisit_s / risk
 
-## Grid and point IDs
+@dataclass(frozen=True)
+class Drone:
+    id: int
+    x: float                             # current position (m)
+    y: float
 
-- The grid has a fixed origin (0, 0) and a fixed cell size. A cell ID is `(grid_x, grid_y)`. It is not an array position.
-- The monitoring point is the cell centre. The maximum distance from the centre to the perimeter is half of the cell diagonal.
-- The model has no collision avoidance, no no-fly zones and no return to base.
+@dataclass(frozen=True)
+class PlanningState:                     # planner input; do not change it
+    time_s: float                        # stage start t
+    horizon_s: float                     # H
+    speed_mps: float
+    service_s: float                     # observation time for each visit
+    drones: tuple[Drone, ...]
+    points: dict[CellId, MonitoringPoint]
+    last_seen: dict[CellId, float]       # last observation, or activation time
+    coverage: dict[CellId, tuple[CellId, ...]] | None   # points that one visit observes (sensor radius, with itself)
+```
+
+## Planner
+
+```python
+def router(state: PlanningState) -> Routes: ...
+```
+
+| Rule | Detail |
+| --- | --- |
+| Keys | One key for each `state.drones[i].id`. A list can be empty. |
+| Items | Each ID must be in `state.points`. Repeats are permitted. |
+| Time | For each drone: `sum(leg_m / speed_mps + service_s) <= horizon_s`. |
+| Start | The first leg starts at the drone position. There is no return to base. |
+| End | A drone waits at its last point. It does not observe while it waits. |
+
+`evaluate` and `Environment.step` raise `ValueError` if a rule is broken. They do not cut a route.
+
+## Evaluation
+
+```python
+def evaluate(state: PlanningState, routes: Routes) -> Evaluation: ...   # does not change the state
+
+@dataclass
+class Evaluation:
+    objective: float                             # J
+    overdue_count: int                           # points with P_i > q_i
+    mean_gap_s: float                            # mean P_i
+    max_gap_s: float                             # max P_i
+    total_distance_m: float
+    longest_route_m: float
+    gaps_s: dict[CellId, float]                  # P_i
+    observations: dict[CellId, list[float]]      # sorted, no duplicates
+    end_drones: tuple[Drone, ...]
+    visits: list[tuple[float, int, CellId]]      # (time, drone_id, visited point), sorted by time
+```
+
+```text
+visit time   = arrival time + service_s
+a visit to i observes every point in coverage[i] (only i if coverage is None)
+times_i      = [last_seen[i], observations of i in this stage, t + H]
+P_i          = largest difference of adjacent values in times_i
+J            = max_i max(0, P_i / q_i - 1)          (0 if there are no points)
+```
+
+- A gap can start before the stage. Overdue time continues across replans. State this extension of the proposal objective in the report.
+- Activation is not an observation. A new point starts at its activation time.
 
 ## Changes
 
-`changes(previous, current)` gives:
+```python
+def changes(previous: dict[CellId, MonitoringPoint],
+            current: dict[CellId, MonitoringPoint]) -> ChangeSet: ...
 
-- `added`: current IDs that were not in the previous set.
-- `removed`: previous IDs that are not in the current set.
-- `changed`: IDs in both sets with a different risk or revisit period.
-- `affected_current = added | changed`: C_t for selective reset.
-
-`fraction` is `|added ∪ removed ∪ changed| / |previous ∪ current|`. The first activation has fraction 1. It is not an adaptation event. If a change has only removed points, C_t is empty. You must still delete the edges of the removed points.
-
-## Planner contract
-
-`PlanningState` contains: time, horizon, speed, observation time, drone positions, points, `last_seen` and `coverage`. Do not change the state.
-
-- Distances are Euclidean, in metres. Travel time is distance divided by speed.
-- The first leg starts at the current position of the drone.
-- Use `sorted(state.points)` to make matrix indices. The indices are correct for one stage only.
-- When the points change, move pheromone by cell ID, not by matrix index. New edges start at `tau_0`. Delete the edges of removed points.
-- `coverage` gives, for each point, all points in the sensor radius (with the point). If `coverage` is `None`, a visit observes only the visited point.
-
-The planner returns one ordered list of IDs for each drone. A list can be empty.
-
-- A route can visit a point more than one time. Drones can visit the same point.
-- All legs and observations must end in the horizon H. `evaluate` rejects a longer route. It does not cut the route.
-- A drone stops at its last point. It does not observe while it waits.
-- There is no replan during a flight.
-
-`evaluate(state, routes)` does not change the environment. Use it to compare candidates. Use `env.step(routes, H)` to fly the selected routes. `Evaluation.visits` lists `(time, drone_id, point_id)` for each observation.
-
-For strategy comparisons:
-
-- Start each strategy from the same environment, history and pheromone.
-- Use the same random seeds.
-- Use the same planning time.
-
-## Revisit accounting
-
-An observation occurs when the drone completes its observation time. If two observations occur at the same time, they count as one.
-
-For a point in stage [t, t+H], make this list of times:
-
-```text
-[last observation (or activation), observations in this stage, t+H]
+@dataclass(frozen=True)
+class ChangeSet:
+    added: frozenset[CellId]                     # in current only
+    removed: frozenset[CellId]                   # in previous only
+    changed: frozenset[CellId]                   # in both; risk or revisit_s is different
+    affected_current: frozenset[CellId]          # added | changed = C_t (property)
+    def fraction(self, previous, current) -> float: ...   # |added ∪ removed ∪ changed| / |previous ∪ current|
 ```
 
-`P_i` is the largest difference between two adjacent times. `J = max_i max(0, P_i / q_i - 1)`.
+Pheromone rules:
 
-- The last interval (to t+H) is included. Thus an unvisited point has a gap.
-- A gap can start before the stage. The overdue time continues across replans. This is an extension of the proposal objective. State it in the report.
-- A new point starts at age 0. Activation is not an observation.
-- A removed point leaves the objective. If it comes back, it starts a new life.
-- With no points, J, the counts and the distances are 0.
-- `overdue_count` counts the points with `P_i > q_i` in the stage.
-- Route distance starts at the current position. It does not contain observation time or a return to base.
+- Use `sorted(state.points)` for matrix indices. The indices are correct for one stage only.
+- Move pheromone by `CellId`, not by matrix index.
+- New edges start at `tau_0`. Delete all edges of `removed` points, also when `C_t` is empty.
 
+## Environment
+
+```python
+env = Environment(drones: list[Drone], *, speed_mps=15.0, service_s=5.0, sensor_radius_m=0.0)
+env.activate(points: dict[CellId, MonitoringPoint]) -> None   # new IDs: last_seen = env.time_s
+                                                              # kept IDs: last_seen does not change
+                                                              # missing IDs: removed with their history
+env.state(horizon_s: float) -> PlanningState
+env.step(routes: Routes, horizon_s: float) -> Evaluation       # updates last_seen and drones; time_s += H
+env.mark_observed(time_s: float, ids=None) -> None             # a snapshot observes all (or ids) points
+```
+
+## Mission
+
+```python
+config = MissionConfig(cell_size_m=500.0, sensor_radius_m=None,   # None: radius = cell size
+                       base_revisit_s=900.0, rate_tiers_mpm=(2.0, 10.0),
+                       drones=3, speed_mps=15.0, service_s=5.0, horizon_s=600.0)
+
+rows = run_mission(field: ArrivalField, router, config,
+                   *, start_s=None, stop_s=None,             # default: first and last snapshot
+                   record=None) -> list[dict]               # record(stage, fire_map, points, routes)
+```
+
+One row for each stage:
+
+| Key | Value |
+| --- | --- |
+| `stage`, `time_s`, `horizon_s` | Stage number, start t, H |
+| `snapshot_delivered` | Snapshot indices given to the planner at this stage |
+| `map_points` | Number of points on the fleet map |
+| `added`, `removed`, `changed`, `affected_current`, `affected_union_fraction` | `changes()` results |
+| `planning_s` | Router time (s) |
+| `visits` | Completed observations |
+| `map_objective`, `map_overdue_count` | J and overdue count on the fleet map |
+| `true_front_points`, `true_objective`, `true_overdue_count`, `true_max_gap_s` | The same on the true active front |
+| `front_on_map_fraction` | True front cells on the map / true front cells |
+| `known_burned_fraction` | Known burned area / true burned area |
+| `total_distance_m`, `longest_route_m` | Route lengths |
+
+## Loading
+
+```python
+sequence, provenance = load_feds(path, *, fire_id, year=None, target_crs=None,
+                                 repair=False, limit=None)
+# sequence:   list[Perimeter(timestamp: datetime, geometry: Polygon | MultiPolygon)], time order, metric CRS
+# provenance: {"source", "source_sha256", "source_crs", "target_crs", "year", "fire_id", "layer",
+#              "geometry_repairs", "timestamp_convention", "duplicate_rows_unioned", "dataset_doi"}
+
+field, sequence = load_fire(path, *, fire_id, year=None, limit=None, crs=None, repair=True,
+                            cache_dir="data/cache", res=100.0, pad=2000.0, seed=0,
+                            model=SpreadModel(), weather=True, terrain=True, convention="overpass")
+```
+
+Provenance records where the data came from, so that another person can repeat a run. `fire-sim` writes it into `field.json` and `config.json`.
+
+`load_feds` raises `ValueError` for: no records for the fire, a fire ID in more than one year without `year`, no CRS, missing columns, missing times, empty geometry, invalid geometry with `repair=False`, non-polygon geometry, or a target CRS that is not in metres.
+
+## Strategy comparison
+
+- Clone the same environment, history and pheromone for each strategy.
+- Use the same random seeds.
+- Use the same planning time.
