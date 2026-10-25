@@ -130,16 +130,19 @@ config = MissionConfig(cell_size_m=500.0, sensor_radius_m=None,   # None: radius
                        base_revisit_s=900.0, rate_tiers_mpm=(2.0, 10.0),
                        drones=3, speed_mps=15.0, service_s=5.0, horizon_s=600.0)
 
-rows = run_mission(field: ArrivalField, router, config,
-                   *, start_s=None, stop_s=None,             # default: first and last snapshot
-                   record=None) -> list[dict]               # record(stage, fire_map, points, routes)
+rows, blocks = run_mission(field: ArrivalField, router, config,
+                           *, start_s=None, stop_s=None,     # default: first and last snapshot
+                           record=None)                      # record(stage, fire_map, points, routes)
+# rows:   list[dict], one for each stage
+# blocks: list[dict], one for each 12-hour block
 ```
 
-One row for each stage:
+`rows`, one for each stage:
 
 | Key | Value |
 | --- | --- |
 | `stage`, `time_s`, `horizon_s` | Stage number, start t, H |
+| `block` | Index k of the most recent snapshot |
 | `snapshot_delivered` | Snapshot indices given to the planner at this stage |
 | `map_points` | Number of points on the fleet map |
 | `added`, `removed`, `changed`, `affected_current`, `affected_union_fraction` | `changes()` results |
@@ -150,6 +153,24 @@ One row for each stage:
 | `front_on_map_fraction` | True front cells on the map / true front cells |
 | `known_burned_fraction` | Known burned area / true burned area |
 | `total_distance_m`, `longest_route_m` | Route lengths |
+
+`blocks`, one for each block (from snapshot k to snapshot k+1):
+
+| Key | Value |
+| --- | --- |
+| `block`, `start_s`, `end_s`, `stages` | k, start, end, number of stages |
+| `snapshot_changed_fraction` | `affected_union_fraction` at the first stage. Empty for the first block. |
+| `within_changed_fraction_median` | Median `affected_union_fraction` of the other stages |
+| `map_objective_max`, `map_objective_mean` | J on the fleet map |
+| `true_objective_max` | J on the true active front |
+| `end_snapshot` | k+1. Empty if the mission stops before it. |
+| `discovered_growth_fraction` | Found growth / FEDS growth from A_k to A_{k+1} |
+| `perimeter_error_m` | Mean distance from the snapshot perimeter to the mapped perimeter |
+
+```python
+FireMap.score_snapshot(k: int) -> dict   # call before ingest_snapshot(k); k >= 1
+# {"snapshot", "snapshot_s", "growth_cells", "discovered_growth_fraction", "perimeter_error_m"}
+```
 
 ## Loading
 

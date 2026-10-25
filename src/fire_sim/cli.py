@@ -71,9 +71,10 @@ def mission_command(config):
         if config.output.gif and stage % config.output.gif_every == 0:
             frames.append((stage, fire_map.known.copy(), dict(points), routes))
 
-    rows = run_mission(field, smoke_router, config.mission, start_s=start, stop_s=stop, record=record)
+    rows, blocks = run_mission(field, smoke_router, config.mission, start_s=start, stop_s=stop, record=record)
     out = _output_dir(config, config.output.mission_dir)
     _write_csv(rows, out / "metrics.csv")
+    _write_csv(blocks, out / "blocks.csv")
     (out / "run.json").write_text(json.dumps({"config": asdict(config), "fire": field.meta},
                                              indent=2, default=str) + "\n")
     plot_mission(field, rows, out / "mission.png")
@@ -84,7 +85,8 @@ def mission_command(config):
                       "map_points_median": sorted(r["map_points"] for r in rows)[len(rows) // 2],
                       "changed_fraction_median": sorted(fractions)[len(fractions) // 2] if fractions else None,
                       "worst_true_objective": max(r["true_objective"] for r in rows),
-                      "mean_front_on_map": sum(r["front_on_map_fraction"] for r in rows) / len(rows)}, indent=2))
+                      "mean_front_on_map": sum(r["front_on_map_fraction"] for r in rows) / len(rows),
+                      "blocks": blocks}, indent=2, default=str))
 
 
 def main():

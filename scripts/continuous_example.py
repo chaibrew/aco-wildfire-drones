@@ -19,7 +19,7 @@ class Router:
 
 def main():
     field, _ = load_fire("data/raw/LargeFires_2018.gpkg", fire_id=3885, year=2018, limit=8)
-    rows = run_mission(field, Router(), MissionConfig(cell_size_m=1000, drones=6), stop_s=2 * 3600)
+    rows, _ = run_mission(field, Router(), MissionConfig(cell_size_m=1000, drones=6), stop_s=2 * 3600)
     print(f"true-front J at end: {rows[-1]['true_objective']:.2f}, front on map: {rows[-1]['front_on_map_fraction']:.0%}")
 
 

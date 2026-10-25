@@ -69,15 +69,18 @@ def run_mission(field, router, config=MissionConfig(), *, start_s=None, stop_s=N
     env = Environment([Drone(i, *depot) for i in range(config.drones)], speed_mps=config.speed_mps,
                       service_s=config.service_s, sensor_radius_m=config.radius)
     env.time_s = start
-    rows, previous, stage = [], {}, 0
+    rows, scores, previous, stage = [], {}, {}, 0
+    block = available[-1]
     while env.time_s + 1e-9 < stop:
         t = env.time_s
         horizon = min(config.horizon_s, stop - t)
         delivered = []
         for k, s in enumerate(field.snapshot_s):
             if k not in fire_map.snapshots_ingested and s <= t:
+                scores[k] = fire_map.score_snapshot(k)
                 fire_map.ingest_snapshot(k)
                 delivered.append(k)
+                block = k
         points = fire_map.points()
         delta = changes(previous, points)
         env.activate(points)
@@ -95,7 +98,7 @@ def run_mission(field, router, config=MissionConfig(), *, start_s=None, stop_s=N
         true_points, true_result = truth.score(t, t + horizon, result.visits, positions, satellite)
         believed, actual = set(points), set(true_points)
         rows.append({
-            "stage": stage, "time_s": t, "horizon_s": horizon,
+            "stage": stage, "block": block, "time_s": t, "horizon_s": horizon,
             "snapshot_delivered": ",".join(map(str, delivered)),
             "map_points": len(points), "added": len(delta.added), "removed": len(delta.removed),
             "changed": len(delta.changed), "affected_current": len(delta.affected_current),
@@ -110,4 +113,28 @@ def run_mission(field, router, config=MissionConfig(), *, start_s=None, stop_s=N
         if record:
             record(stage, fire_map, points, routes)
         previous, stage = points, stage + 1
-    return rows
+    for k, s in enumerate(field.snapshot_s):
+        if k not in fire_map.snapshots_ingested and k not in scores and s <= env.time_s + 1e-9:
+            scores[k] = fire_map.score_snapshot(k)
+    return rows, summarise_blocks(rows, scores)
+
+
+def summarise_blocks(rows, scores):
+    blocks = []
+    for k in dict.fromkeys(r["block"] for r in rows):
+        stages = [r for r in rows if r["block"] == k]
+        within = sorted(r["affected_union_fraction"] for r in stages[1:])
+        opening = stages[0]["affected_union_fraction"] if stages[0]["snapshot_delivered"] else None
+        end = scores.get(k + 1, {})
+        blocks.append({
+            "block": k, "start_s": stages[0]["time_s"],
+            "end_s": stages[-1]["time_s"] + stages[-1]["horizon_s"], "stages": len(stages),
+            "snapshot_changed_fraction": opening,
+            "within_changed_fraction_median": within[len(within) // 2] if within else None,
+            "map_objective_max": max(r["map_objective"] for r in stages),
+            "map_objective_mean": sum(r["map_objective"] for r in stages) / len(stages),
+            "true_objective_max": max(r["true_objective"] for r in stages),
+            "end_snapshot": end.get("snapshot"),
+            "discovered_growth_fraction": end.get("discovered_growth_fraction"),
+            "perimeter_error_m": end.get("perimeter_error_m")})
+    return blocks

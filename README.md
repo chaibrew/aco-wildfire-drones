@@ -42,13 +42,15 @@ Output in `[output] fire_dir`: `field.npz` and `field.json` (the fire), `fire.pn
 - The most recent FEDS perimeter. A new perimeter arrives each 12 hours.
 - Drone observations. When a drone completes an observation, it sees the true fire in its sensor radius.
 
-The monitoring points are the grid cells on the mapped perimeter. The risk of a point comes from the observed spread rate. For each stage, the mission calculates J two times: on the fleet map and on the true active front.
+The monitoring points are the grid cells on the mapped perimeter. The risk of a point comes from the observed spread rate. The planner objective is J on the fleet map.
+
+The mission runs in 12-hour blocks. A block starts at one FEDS snapshot and ends at the next. At the end of a block, the next snapshot first scores the fleet map. Then the planner receives it as the start of the next block.
 
 ```sh
 fire-sim mission configs/camp-3885.toml
 ```
 
-Output in `[output] mission_dir`: `metrics.csv` (one row for each stage), `run.json` (the full config and the fire provenance), `mission.png`, `mission.gif` (if `gif = true`), and a copy of the config.
+Output in `[output] mission_dir`: `metrics.csv` (one row for each stage), `blocks.csv` (one row for each 12-hour block, with the snapshot score), `run.json` (the full config and the fire provenance), `mission.png`, `mission.gif` (if `gif = true`), and a copy of the config.
 
 ## Configuration
 

@@ -107,6 +107,24 @@ The first snapshot has no previous snapshot. Thus, if the mission starts at the 
 - `true_objective` is J on these cells. Fire that the fleet did not find becomes overdue.
 - `front_on_map_fraction` is the fraction of the true front cells that are on the fleet map.
 
+### Snapshot score
+
+A block runs from snapshot k to snapshot k+1. Before the map receives snapshot k+1, the mission compares the map with it (`FireMap.score_snapshot`):
+
+- `discovered_growth_fraction`: the fraction of the growth from A_k to A_{k+1} that drones found before the snapshot.
+- `perimeter_error_m`: the mean distance from the snapshot perimeter to the mapped perimeter.
+
+The score uses only FEDS data. It does not use the interpolated fire. It is a validation, not part of the objective.
+
+Camp Fire, 24 h, 6 drones, 1 km cells, `smoke_router`:
+
+| Block | Growth found | Perimeter error |
+| --- | ---: | ---: |
+| 0 (0–12 h) | 86% | 743 m |
+| 1 (12–24 h) | 93% | 25 m |
+
+In block 0, the drones did not find two spot fires. Their perimeters are far from the mapped perimeter. Thus the error is large.
+
 ### Change pattern
 
 Camp Fire, 24 h, 6 drones, 1 km cells, `smoke_router`:

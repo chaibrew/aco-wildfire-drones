@@ -29,6 +29,20 @@ class FireMap:
         self.evidence = {}
         self.snapshots_ingested = []
 
+    def score_snapshot(self, k):
+        field = self.field
+        if not 1 <= k < len(field.snapshot_s):
+            raise ValueError("Only snapshots after the first can be scored")
+        observed = field.arrival_s <= field.snapshot_s[k]
+        growth = observed & ~(field.arrival_s <= field.snapshot_s[k - 1])
+        true_edge = observed & ndimage.binary_dilation(~observed, FOUR, border_value=0)
+        map_edge = self._perimeter()
+        distance = ndimage.distance_transform_edt(~map_edge) * field.raster.res if map_edge.any() else None
+        return {"snapshot": k, "snapshot_s": field.snapshot_s[k],
+                "growth_cells": int(growth.sum()),
+                "discovered_growth_fraction": float((self.known & growth).sum() / growth.sum()) if growth.any() else 1.0,
+                "perimeter_error_m": float(distance[true_edge].mean()) if distance is not None and true_edge.any() else float("nan")}
+
     def ingest_snapshot(self, k):
         field = self.field
         s = field.snapshot_s[k]

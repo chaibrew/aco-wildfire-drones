@@ -78,7 +78,7 @@ def test_planner_never_sees_truth_between_snapshots(field):
         return {d.id: [] for d in state.drones}
 
     config = MissionConfig(cell_size_m=500, horizon_s=3600, drones=1)
-    rows = run_mission(field, idle, config)
+    rows, blocks = run_mission(field, idle, config)
     snapshot0 = FireMap(field, cell_size_m=500)
     snapshot0.ingest_snapshot(0)
     snapshot1 = FireMap(field, cell_size_m=500)
@@ -88,11 +88,33 @@ def test_planner_never_sees_truth_between_snapshots(field):
     lagging = [r["front_on_map_fraction"] for r in rows if 6 * 3600 <= r["time_s"] < DAY]
     assert min(lagging) < 0.5
     assert [r["snapshot_delivered"] for r in rows if r["snapshot_delivered"]] == ["1"]
+    assert [b["block"] for b in blocks] == [0, 1]
+    assert [b["end_snapshot"] for b in blocks] == [1, 2]
+    assert all(b["discovered_growth_fraction"] == 0 for b in blocks)
+    assert all(b["perimeter_error_m"] > 500 for b in blocks)
+    assert blocks[0]["snapshot_changed_fraction"] is None and blocks[1]["snapshot_changed_fraction"] > 0
+
+
+def test_snapshot_score_with_full_knowledge(field):
+    fire_map = FireMap(field, cell_size_m=500)
+    fire_map.ingest_snapshot(0)
+    fire_map.known = field.arrival_s <= DAY
+    score = fire_map.score_snapshot(1)
+    assert score["discovered_growth_fraction"] == 1.0 and score["perimeter_error_m"] == 0.0
+    with pytest.raises(ValueError):
+        fire_map.score_snapshot(0)
+
+
+def test_flying_fleet_discovers_growth(field):
+    from fire_sim.simulation import smoke_router
+    _, blocks = run_mission(field, smoke_router, MissionConfig(cell_size_m=500, drones=3), stop_s=DAY)
+    assert len(blocks) == 1 and blocks[0]["end_snapshot"] == 1
+    assert blocks[0]["discovered_growth_fraction"] > 0.3
 
 
 def test_mission_rows_and_truth_scoring(field):
     from fire_sim.simulation import smoke_router
-    rows = run_mission(field, smoke_router, MissionConfig(cell_size_m=500, drones=2), stop_s=6 * 3600)
+    rows, _ = run_mission(field, smoke_router, MissionConfig(cell_size_m=500, drones=2), stop_s=6 * 3600)
     assert len(rows) == 36
     assert all(r["visits"] > 0 for r in rows)
     assert all(0 <= r["front_on_map_fraction"] <= 1 for r in rows)
