@@ -1,5 +1,3 @@
-"""Build a continuous fire (ArrivalField) from a FEDS sequence plus weather and terrain."""
-
 import hashlib
 import json
 from dataclasses import asdict, dataclass
@@ -14,7 +12,6 @@ from .weather import Weather, fetch_hourly, overpass_utc
 
 
 def snapshot_clock(sequence, lon, convention="overpass"):
-    """UTC time of each snapshot and seconds after the first."""
     if convention == "overpass":
         stamps = [overpass_utc(p.timestamp, lon) for p in sequence]
     elif convention == "label":
@@ -27,7 +24,6 @@ def snapshot_clock(sequence, lon, convention="overpass"):
 
 @dataclass
 class Inputs:
-    """Everything the interpolation needs besides the spread model and seed."""
     raster: Raster
     crs: str
     stamps: list
@@ -37,7 +33,6 @@ class Inputs:
     weather: object = None
 
     def drivers(self, indices):
-        """Interval drivers between consecutive snapshot indices (or None if no weather)."""
         if self.weather is None:
             return None
         return [self.weather.drivers(self.times_s[a], self.times_s[b]) for a, b in zip(indices, indices[1:])]
@@ -81,7 +76,6 @@ def build_field(sequence, crs, *, seed=0, model=SpreadModel(), provenance=None, 
 
 def load_fire(path, *, fire_id, year=None, limit=None, crs=None, repair=True,
               cache_dir="data/cache", **options):
-    """Load FEDS and build (or reuse a cached) ArrivalField. Returns (field, sequence)."""
     sequence, provenance = load_feds(path, fire_id=fire_id, year=year, target_crs=crs,
                                      repair=repair, limit=limit)
     crs = provenance["target_crs"]

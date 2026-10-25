@@ -27,7 +27,7 @@ def test_holes_and_multipolygons():
     shape = Polygon([(1, 1), (99, 1), (99, 99), (1, 99)],
                     holes=[[(31, 31), (69, 31), (69, 69), (31, 69)]])
     points = Grid(cell_size_m=10).points(MultiPolygon([shape, box(121, 1, 139, 19)]))
-    assert (3, 4) in points  # Internal hole boundary is monitored.
+    assert (3, 4) in points
     assert (4, 4) not in points
     assert (12, 0) in points
 

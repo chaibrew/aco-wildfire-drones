@@ -1,5 +1,3 @@
-"""Deterministic, event-based point-observation simulation."""
-
 import math
 from dataclasses import dataclass
 
@@ -47,11 +45,6 @@ class Evaluation:
 
 
 def evaluate(state: PlanningState, routes: dict[int, list[CellId]]) -> Evaluation:
-    """Pure evaluation shared by all planners; infeasible routes raise ValueError.
-
-    Observations occur on service completion. No implicit start-position visits,
-    return-to-base, range sensing, or observations during final idle time.
-    """
     if set(routes) != {d.id for d in state.drones}:
         raise ValueError("Provide exactly one route (possibly empty) per drone")
     observations = {i: [] for i in state.points}
@@ -82,11 +75,6 @@ def evaluate(state: PlanningState, routes: dict[int, list[CellId]]) -> Evaluatio
 
 
 def gap_metrics(points, last_seen, observations, end):
-    """Longest unobserved interval P_i per point and J = max_i max(0, P_i / q_i - 1).
-
-    Observations are deduplicated and sorted in place. Gaps run from the last
-    observation (or activation) through every observation to the window end.
-    """
     gaps = {}
     for i in points:
         visits = sorted(set(observations.get(i, [])))
@@ -154,11 +142,6 @@ class Environment:
 
 
 def smoke_router(state: PlanningState):
-    """Small deterministic urgency/distance router for plumbing checks only.
-
-    This is not the project's agreed greedy baseline or an ACO implementation.
-    Repeated visits are permitted; all scheduled legs fit inside the horizon.
-    """
     import heapq
 
     routes = {d.id: [] for d in state.drones}

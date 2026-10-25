@@ -1,20 +1,3 @@
-"""What the fleet knows about the fire, as opposed to the ground-truth ArrivalField.
-
-The map starts from FEDS snapshots and grows from drone observations. A drone
-finishing an observation at (x, y, t) sees the true burned state within its
-sensor radius at time t. Anything not observed is assumed unchanged since it
-was last seen, so the believed perimeter lags the true one until a drone or
-the next snapshot catches up.
-
-Spread evidence per monitoring cell (m/s, time) comes from:
-- a snapshot: distance each newly burned cell lies beyond the previous
-  snapshot, divided by the interval;
-- a drone: distance each newly seen burned cell lies beyond the previously
-  known fire, divided by the time since that spot was last observed. Looking
-  at a perimeter cell and seeing no advance records a rate of zero.
-Newer evidence replaces older evidence.
-"""
-
 import math
 
 import numpy as np
@@ -47,7 +30,6 @@ class FireMap:
         self.snapshots_ingested = []
 
     def ingest_snapshot(self, k):
-        """Fleet-wide update from FEDS snapshot k (true burned area at its observation time)."""
         field = self.field
         s = field.snapshot_s[k]
         observed = field.arrival_s <= s
@@ -62,7 +44,6 @@ class FireMap:
         self.snapshots_ingested.append(k)
 
     def observe(self, x, y, t):
-        """A drone's observation at (x, y) finishing at time t."""
         raster = self.field.raster
         r = self.sensor_radius_m
         margin = 2 * r + raster.res
@@ -112,7 +93,6 @@ class FireMap:
         return 1 + int(mpm >= low) + int(mpm >= high)
 
     def points(self):
-        """Monitoring points on the believed perimeter, risk from spread evidence."""
         perimeter = self._perimeter()
         if not perimeter.any():
             return {}
@@ -127,6 +107,5 @@ class FireMap:
         return result
 
     def known_fraction(self, t):
-        """Share of the truly burned area the fleet knows about at time t."""
         truth = self.field.arrival_s <= t
         return float((self.known & truth).sum() / max(1, truth.sum()))

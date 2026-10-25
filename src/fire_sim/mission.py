@@ -1,16 +1,3 @@
-"""Mission loop: the planner sees only the fleet's map; scoring also uses the hidden truth.
-
-Each stage of length H starting at t:
-1. deliver any FEDS snapshot whose observation time + latency has passed;
-2. build monitoring points from the FireMap and plan routes on them;
-3. fly the routes; every finished observation updates the map;
-4. score the stage on the planner's points (what it optimised) and on the true
-   active front (what actually needed watching).
-
-A satellite snapshot counts as an observation of every point at its
-observation time, for both the map and the truth score.
-"""
-
 import math
 import time
 from dataclasses import dataclass
@@ -41,8 +28,6 @@ class MissionConfig:
 
 
 class TruthTracker:
-    """Revisit gaps on the true active front, observed through drone footprints."""
-
     def __init__(self, monitor, radius):
         self.monitor = monitor
         self.radius = radius
@@ -67,7 +52,6 @@ class TruthTracker:
 
 
 def run_mission(field, router, config=MissionConfig(), *, start_s=None, stop_s=None, record=None):
-    """Returns per-stage rows; `record(stage, fire_map, points, routes)` is called each stage."""
     start = field.start_s if start_s is None else start_s
     stop = field.end_s if stop_s is None else min(stop_s, field.end_s)
     if not field.start_s <= start < stop:

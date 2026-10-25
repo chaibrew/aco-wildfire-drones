@@ -1,5 +1,3 @@
-"""Fixed world grid: boundary intersection, not burned-interior coverage."""
-
 import hashlib
 import math
 from dataclasses import dataclass
@@ -32,7 +30,6 @@ class Grid:
             raise ValueError("Expected a valid nonempty Polygon or MultiPolygon")
         size = self.cell_size_m
         xmin, ymin, xmax, ymax = polygon.bounds
-        # Include cells touching the boundary on either side of a grid line.
         lo_x = math.ceil((xmin - self.origin_x) / size) - 1
         lo_y = math.ceil((ymin - self.origin_y) / size) - 1
         hi_x = math.floor((xmax - self.origin_x) / size)
@@ -45,7 +42,6 @@ class Grid:
             for iy in range(lo_y, hi_y + 1):
                 x, y = self.origin_x + ix * size, self.origin_y + iy * size
                 if boundary.intersects(box(x, y, x + size, y + size)):
-                    # Stable across Python processes, births, removals and reappearances.
                     digest = hashlib.sha256(f"{self.seed}:{ix}:{iy}".encode()).digest()
                     risk = 1 + int.from_bytes(digest[:8], "big") % 3
                     result[ix, iy] = MonitoringPoint((ix, iy), x + size / 2, y + size / 2,
@@ -61,7 +57,6 @@ def changes(previous, current, *, geometry_changed=()):
 
 
 def perimeter_changes(grid, before, after, previous, current):
-    """Also flag surviving cells whose local boundary segment changed."""
     altered = []
     for i in previous.keys() & current.keys():
         p = current[i]

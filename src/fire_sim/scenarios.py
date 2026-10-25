@@ -1,5 +1,3 @@
-"""Synthetic smoke cases and controlled geometric growth experiments."""
-
 import math
 import random
 from datetime import datetime, timedelta, timezone
@@ -22,12 +20,6 @@ def synthetic_sequence(steps=6):
 
 
 def perturb(perimeter, *, locality="local", radius_m=400.0, patches=4, seed=42):
-    """Add circular growth patches along exteriors. Actual changed fraction is measured.
-
-    'local' uses a contiguous tenth of boundary arc length on the largest polygon;
-    'distributed' spaces patches over the total exterior arc length of all parts.
-    Radius/patch count control geometry, not an exact monitoring-point fraction.
-    """
     if locality not in {"local", "distributed"}:
         raise ValueError("locality must be local or distributed")
     if not math.isfinite(radius_m) or radius_m <= 0 or patches < 1:

@@ -17,7 +17,7 @@ def test_gaps_include_window_edges_and_unvisited_points():
     assert result.objective == 4
     assert result.overdue_count == 2
     assert result.total_distance_m == 3
-    assert env.time_s == 0  # Evaluation is pure.
+    assert env.time_s == 0
 
 
 def test_observation_history_and_position_persist_across_replanning():
@@ -32,7 +32,7 @@ def test_observation_history_and_position_persist_across_replanning():
     env.activate({})
     env.step({0: []}, 10)
     env.activate(points)
-    assert env.last_seen[(0, 0)] == 30  # Reappearance starts new active lifetime.
+    assert env.last_seen[(0, 0)] == 30
 
 
 def test_repeated_and_simultaneous_visits_and_exact_deadline():

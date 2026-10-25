@@ -10,3 +10,4 @@ outputs/*
 !outputs/.gitkeep
 data/cache/*
 !data/cache/.gitkeep
+prose-to-rewrite.md

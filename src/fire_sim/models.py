@@ -29,7 +29,6 @@ class ChangeSet:
 
     @property
     def affected_current(self) -> frozenset[CellId]:
-        """C_t: new or altered current points; removed edges must be deleted."""
         return self.added | self.changed
 
     def fraction(self, previous: dict, current: dict) -> float:

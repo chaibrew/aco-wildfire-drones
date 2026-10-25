@@ -69,8 +69,6 @@ def test_wind_burns_downwind_side_first(raster):
 
 
 def test_steep_ground_is_crossed_quickly(raster):
-    # Snapshots fix where the fire got to, so slope reshapes timing along the path:
-    # a steep inner half of the band (uphill outwards) burns early, the flat outer half late.
     x, y = raster.centres()
     elevation = 0.5 * np.clip(np.hypot(x, y) - 1000, 0, 500)
     arrival, _ = interpolate(raster, discs(1000, 2000), [0, DAY], model=CALM, elevation=elevation)
@@ -80,7 +78,7 @@ def test_steep_ground_is_crossed_quickly(raster):
 
 def test_pacing_curve_moves_growth_in_time(raster):
     clock = tuple(np.linspace(0, DAY, 25))
-    late = tuple((np.linspace(0, 1, 25)) ** 3)  # most growth near the end
+    late = tuple((np.linspace(0, 1, 25)) ** 3)
     uniform, _ = interpolate(raster, discs(1000, 2000), [0, DAY], model=CALM)
     paced, _ = interpolate(raster, discs(1000, 2000), [0, DAY], model=CALM,
                            drivers=[IntervalDrivers(pace_times_s=clock, pace_fraction=late)])

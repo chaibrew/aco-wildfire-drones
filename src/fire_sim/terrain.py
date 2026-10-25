@@ -1,9 +1,3 @@
-"""Elevation from the Copernicus GLO-30 DEM (public AWS bucket, ~30 m, no key).
-
-Only the windows covering the fire raster are read from the cloud-optimised
-GeoTIFF tiles, resampled bilinearly onto the raster and cached as .npy.
-"""
-
 import hashlib
 import json
 import math
@@ -27,7 +21,6 @@ def tile_names(lon_min, lat_min, lon_max, lat_max):
 
 
 def fetch_elevation(raster: Raster, crs, cache_dir="data/cache/dem"):
-    """Elevation (m) on the raster, indexed [iy, ix] with iy northwards."""
     key = hashlib.sha256(json.dumps([str(crs), raster.x0, raster.y0, raster.res,
                                      raster.nx, raster.ny]).encode()).hexdigest()[:16]
     cache = Path(cache_dir) / f"{key}.npy"
@@ -46,7 +39,7 @@ def fetch_elevation(raster: Raster, crs, cache_dir="data/cache/dem"):
             try:
                 src = rasterio.open("/vsicurl/" + TILE_URL.format(name=name))
             except rasterio.errors.RasterioIOError:
-                continue  # Copernicus omits all-ocean tiles
+                continue
             with src, WarpedVRT(src, crs=crs, transform=raster.top_down_transform(),
                                 width=raster.nx, height=raster.ny,
                                 resampling=Resampling.bilinear, nodata=np.nan,
@@ -55,7 +48,7 @@ def fetch_elevation(raster: Raster, crs, cache_dir="data/cache/dem"):
             elevation = np.where(np.isfinite(tile), tile, elevation)
     if np.isnan(elevation).all():
         raise ValueError("No DEM coverage for this raster")
-    elevation = np.where(np.isnan(elevation), 0.0, elevation)  # sea level outside coverage
+    elevation = np.where(np.isnan(elevation), 0.0, elevation)
     cache.parent.mkdir(parents=True, exist_ok=True)
     np.save(cache, elevation)
     return elevation

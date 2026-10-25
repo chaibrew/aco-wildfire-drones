@@ -1,5 +1,3 @@
-"""Download the published FEDS archive, verify it, extract one year's GeoPackage."""
-
 import argparse
 import hashlib
 import json
@@ -33,7 +31,6 @@ def main():
     if md5 != entry["computed_md5"]:
         raise ValueError(f"Checksum mismatch for {archive}; remove it and retry")
     name = f"LargeFires_{args.year}.gpkg"
-    # Copy only this known regular file, never extract arbitrary archive paths.
     with tarfile.open(archive) as package:
         member = package.getmember(f"Largefire/{name}")
         if not member.isfile():

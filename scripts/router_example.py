@@ -1,5 +1,3 @@
-"""Minimal integration pattern: replace smoke_router with your planner."""
-
 from fire_sim import Drone, Environment, Grid, evaluate
 from fire_sim.grid import perimeter_changes
 from fire_sim.scenarios import synthetic_sequence
@@ -16,8 +14,6 @@ def main():
                                   frame.geometry, previous_points, points)
         env.activate(points)
         state = env.state(horizon_s=600)
-        # ACO hook: update/remap pheromone using delta and stable cell IDs here.
-        # During search, score candidates using evaluate(state, candidate_routes).
         routes = smoke_router(state)
         predicted = evaluate(state, routes)
         actual = env.step(routes, horizon_s=600)

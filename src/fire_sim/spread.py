@@ -1,22 +1,3 @@
-"""Physics-guided arrival-time interpolation between observed fire perimeters.
-
-FEDS observes the fire twice a day. Between two snapshots A_k (at t_k) and
-A_{k+1} (at t_{k+1}) every newly burned cell x gets an arrival time
-
-    T(x) = t_k + pace_k^{-1}( tau_f(x) / (tau_f(x) + tau_b(x)) )
-
-where tau_f is the least travel time from A_k to x and tau_b the least travel
-time from x to the edge of A_{k+1}, both through a directional spread-rate
-field (wind ellipse, upslope boost, seeded heterogeneity). pace_k maps the
-fraction of the interval's spread to clock time using hourly fire weather.
-Both snapshots are reproduced exactly on the raster: {T <= t_k} == A_k.
-Only relative rates matter, so no absolute fuel model is needed. Because the
-snapshots already record how far the fire got in each direction, a speed-up
-that is constant along a path cancels in the ratio; physics reshapes timing
-where speed varies along a path (steep then flat ground, heterogeneity) and
-where the fastest way in and the fastest way out differ (flanks under wind).
-"""
-
 import json
 import math
 from dataclasses import asdict, dataclass, field
@@ -29,16 +10,14 @@ from scipy import ndimage
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import dijkstra
 
-# (dx, dy) steps: 4-, diagonal- and knight-neighbours cut grid-direction bias.
 OFFSETS = ((1, 0), (0, 1), (-1, 0), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1),
            (2, 1), (1, 2), (-1, 2), (-2, 1), (-2, -1), (-1, -2), (1, -2), (2, -1))
 FOUR = ndimage.generate_binary_structure(2, 1)
-MIN_PROGRESS = 1e-6  # keeps newly burned cells strictly after t_k
+MIN_PROGRESS = 1e-6
 
 
 @dataclass(frozen=True)
 class Raster:
-    """Regular grid of square cells; arrays are indexed [iy, ix] with iy northwards."""
     x0: float
     y0: float
     res: float
@@ -48,7 +27,6 @@ class Raster:
     @classmethod
     def covering(cls, bounds, res, pad):
         xmin, ymin, xmax, ymax = bounds
-        # Origin snapped to multiples of res so cells nest inside the monitoring grid.
         x0 = math.floor((xmin - pad) / res) * res
         y0 = math.floor((ymin - pad) / res) * res
         return cls(x0, y0, res, math.ceil((xmax + pad - x0) / res), math.ceil((ymax + pad - y0) / res))
@@ -67,7 +45,6 @@ class Raster:
         return np.meshgrid(xs, ys)
 
     def mask(self, geometry):
-        """Cells whose centre lies inside the polygon."""
         x, y = self.centres()
         shapely.prepare(geometry)
         return shapely.contains_xy(geometry, x, y)
@@ -79,13 +56,6 @@ class Raster:
 
 @dataclass(frozen=True)
 class SpreadModel:
-    """Directional relative spread rate. Defaults are textbook values, not calibrated fits.
-
-    Wind: elliptical spread with Anderson (1983) length-to-breadth ratio from
-    midflame wind (10 m wind x wind_adjustment). Slope: Rothermel (1972) factor
-    phi_s = 5.275 beta^-0.3 tan^2(slope) applied upslope only; beta = 0.01 gives 21.
-    Heterogeneity: log-normal multiplier with Gaussian spatial correlation.
-    """
     wind_adjustment: float = 0.4
     slope_coefficient: float = 21.0
     max_length_to_breadth: float = 8.0
@@ -98,7 +68,6 @@ class SpreadModel:
         return min(max(lb, 1.0), self.max_length_to_breadth)
 
     def wind_factor(self, wind_10m_mps, cos_angle):
-        """Rate relative to the head rate, for an angle measured from the downwind direction."""
         lb = self.length_to_breadth(wind_10m_mps)
         e = math.sqrt(1 - 1 / lb ** 2)
         return (1 - e) / (1 - e * cos_angle)
@@ -117,7 +86,6 @@ class SpreadModel:
 
 @dataclass(frozen=True)
 class IntervalDrivers:
-    """Per-interval inputs: wind toward (east, north) unit vector, speed, and pacing curve."""
     wind_to: tuple[float, float] = (0.0, 0.0)
     wind_mps: float = 0.0
     pace_times_s: tuple[float, ...] = ()
@@ -151,7 +119,6 @@ def _travel_graph(allowed, raster, model, drivers, elevation, slowness):
 
 
 def _with_terminal(graph, cells, costs, outgoing):
-    """Append one virtual node joined to `cells`: terminal->cell if outgoing, else cell->terminal."""
     n = graph.shape[0]
     coo = graph.tocoo()
     terminal = np.full(len(cells), n)
@@ -162,19 +129,12 @@ def _with_terminal(graph, cells, costs, outgoing):
 
 
 def _edge_costs(raster, mask, geometry, slowness):
-    """Sub-cell cost from each masked cell centre to a polygon edge (isotropic, head rate)."""
     x, y = raster.centres()
     distance = shapely.distance(geometry.boundary, shapely.points(x[mask], y[mask]))
     return np.maximum(distance, 1e-3) * slowness[mask]
 
 
 def _progress(before, after, band_graph, raster, before_geom, after_geom, slowness):
-    """Fraction of the interval's spread completed when each newly burned cell ignites.
-
-    Travel happens only through newly burned cells: fire cannot cross ground it
-    already burned. The first and last half-cells are measured to the actual
-    polygon edges, so thin growth bands are not biased towards either end.
-    """
     band = after & ~before
     shape = before.shape
     size = before.size
@@ -185,8 +145,6 @@ def _progress(before, after, band_graph, raster, before_geom, after_geom, slowne
                                        _edge_costs(raster, entry, before_geom, slowness), outgoing=True)
         forward = dijkstra(graph, indices=source)[:size]
     forward = forward.reshape(shape)
-    # Spot fires: band components the observed fire cannot reach inside A_{k+1}
-    # ignite just after t_k at their cell nearest the old perimeter.
     unreached = band & ~np.isfinite(forward)
     spots = 0
     if unreached.any():
@@ -206,7 +164,6 @@ def _progress(before, after, band_graph, raster, before_geom, after_geom, slowne
     backward = backward.reshape(shape)
     with np.errstate(invalid="ignore", divide="ignore"):
         fraction = forward / (forward + backward)
-    # Interior islands with no exit to unburned ground: scale by in-island travel time.
     enclosed = band & ~np.isfinite(backward)
     islands = 0
     if enclosed.any():
@@ -219,11 +176,6 @@ def _progress(before, after, band_graph, raster, before_geom, after_geom, slowne
 
 def interpolate(raster, geometries, times_s, *, model=SpreadModel(), drivers=None,
                 elevation=None, seed=0):
-    """Arrival time (seconds) for every cell; +inf where the fire never arrives.
-
-    Cells inside the first perimeter get times_s[0]. Snapshots are made cumulative,
-    so observed shrinkage (none in published FEDS) is clipped and counted.
-    """
     if len(geometries) != len(times_s) or not geometries:
         raise ValueError("Need one time per perimeter")
     if any(b <= a for a, b in zip(times_s, times_s[1:])):
@@ -257,13 +209,11 @@ def interpolate(raster, geometries, times_s, *, model=SpreadModel(), drivers=Non
 
 
 def spread_rate(arrival, res, initial):
-    """Local front speed 1/|grad T| (m/s) where the arrival time is known; NaN elsewhere."""
     valid = np.isfinite(arrival) & ~initial
     t = np.where(valid, arrival, np.nan)
     grads = []
     with np.errstate(divide="ignore", invalid="ignore"):
         for axis in (0, 1):
-            # Central difference where both neighbours are known, else one-sided.
             fwd = np.diff(t, axis=axis, append=np.nan)
             bwd = np.diff(t, axis=axis, prepend=np.nan)
             both = np.stack([fwd, bwd])
@@ -276,7 +226,6 @@ def spread_rate(arrival, res, initial):
 
 @dataclass
 class ArrivalField:
-    """A continuous fire: burned(t) = arrival_s <= t, with t in seconds after t0 (UTC)."""
     raster: Raster
     crs: str
     t0: datetime
@@ -304,7 +253,6 @@ class ArrivalField:
         return later[0] if later else self.end_s
 
     def perimeter(self, t):
-        """Burned area at time t as a shapely (Multi)Polygon in the field's CRS."""
         from rasterio import features
         mask = np.flipud(self.burned(t)).astype(np.uint8)
         shapes = [shapely.geometry.shape(g) for g, v in

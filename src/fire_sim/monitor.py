@@ -1,15 +1,3 @@
-"""Monitoring points from a continuous fire at any instant.
-
-A fine raster cell is on the perimeter at time t if it has burned and a
-4-neighbour has not. It is on the *active front* if one of those unburned
-neighbours burns before the next FEDS observation (default), or within
-`active_window_s` if set; its spread rate is the fastest such neighbour's rate.
-Because each observation interval has its own growth band, the active set
-drifts slowly between snapshots and shifts substantially at snapshot times.
-Fine cells roll up to the same fixed world grid as grid.Grid (origin 0,
-square cells), so cell IDs stay stable across time.
-"""
-
 from dataclasses import dataclass
 
 import numpy as np
@@ -24,7 +12,6 @@ class FrontMonitor:
     field: ArrivalField
     cell_size_m: float = 500.0
     base_revisit_s: float = 900.0
-    # Spread-rate thresholds (metres/minute) for risk 2 and risk 3; q = base / risk.
     rate_tiers_mpm: tuple[float, float] = (2.0, 10.0)
     active_only: bool = True
     active_window_s: float | None = None
@@ -43,7 +30,6 @@ class FrontMonitor:
             raise ValueError(f"t={t} outside observed span [{self.field.start_s}, {self.field.end_s}]")
 
     def front(self, t):
-        """Fine-raster perimeter mask, active-front mask and front rate (m/s, 0 if inactive)."""
         self._check(t)
         arrival = self.field.arrival_s
         burned = arrival <= t
@@ -61,7 +47,6 @@ class FrontMonitor:
         return 1 + (mpm >= low).astype(int) + (mpm >= high).astype(int)
 
     def cell_rates(self, t):
-        """{cell_id: front rate (m/s)} for monitored grid cells at time t."""
         perimeter, active, rate = self.front(t)
         selected = active if self.active_only else perimeter
         if not selected.any():
@@ -75,7 +60,6 @@ class FrontMonitor:
         return {(int(i), int(j)): float(r) for (i, j), r in zip(keys, best)}
 
     def points(self, t):
-        """{cell_id: MonitoringPoint} at time t, with risk tiers from current spread rate."""
         size = self.cell_size_m
         result = {}
         for (i, j), rate in self.cell_rates(t).items():

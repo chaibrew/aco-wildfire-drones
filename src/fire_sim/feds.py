@@ -1,5 +1,3 @@
-"""Adapter for the published 2012–2020 FEDS Largefire GeoPackages."""
-
 import hashlib
 from pathlib import Path
 
@@ -39,11 +37,6 @@ def _polygonal(geom):
 
 
 def load_feds(path, *, fire_id, year=None, target_crs=None, repair=False, limit=None):
-    """Return a sorted sequence in one metric CRS plus provenance.
-
-    The published time field is a half-day label without a timezone. Preserve it
-    as supplied: this adapter does not claim labels are exact UTC detections.
-    """
     path = Path(path)
     if limit is not None and limit < 1:
         raise ValueError("limit must be positive")
@@ -79,7 +72,6 @@ def load_feds(path, *, fire_id, year=None, target_crs=None, repair=False, limit=
             repairs += 1
         geometries.append(_polygonal(geom))
     frame.geometry = geometries
-    # First snapshot only: avoid using future fire extent to choose the projection.
     crs = CRS.from_user_input(target_crs or frame.iloc[:1].estimate_utm_crs())
     if not crs.is_projected or not crs.axis_info or any(abs(a.unit_conversion_factor - 1) > 1e-12 for a in crs.axis_info):
         raise ValueError("Target CRS must be projected with metre units")

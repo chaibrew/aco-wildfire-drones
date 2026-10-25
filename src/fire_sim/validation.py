@@ -1,12 +1,3 @@
-"""Leave-one-snapshot-out check of the interpolation.
-
-Hide snapshot k, interpolate across the 24 h gap from k-1 to k+1, and compare
-the predicted burned area at t_k with the hidden observation. Scores cover
-only the growth band (cells burned after t_{k-1}), so the unchanged interior
-does not inflate them. A physics-free baseline (straight-line distance, uniform
-pacing) on the same raster shows what wind, slope and pacing add.
-"""
-
 import numpy as np
 
 from .fire import prepare_inputs
@@ -24,7 +15,6 @@ def _score(predicted, observed, before, after):
 
 def leave_one_out(sequence, crs, *, model=SpreadModel(noise_sigma=0.0), seed=0, min_growth_cells=50,
                   **input_options):
-    """Noise is off by default: it adds run-to-run variety, not accuracy."""
     inputs = prepare_inputs(sequence, crs, **input_options)
     baseline = SpreadModel(noise_sigma=0.0)
     masks = [inputs.raster.mask(p.geometry) for p in sequence]
@@ -34,7 +24,7 @@ def leave_one_out(sequence, crs, *, model=SpreadModel(noise_sigma=0.0), seed=0, 
         observed = masks[k] | before
         after = masks[k + 1] | observed
         if (after & ~before).sum() < min_growth_cells:
-            continue  # nothing meaningful to interpolate
+            continue
         geoms = [sequence[k - 1].geometry, sequence[k + 1].geometry]
         times = [inputs.times_s[k - 1], inputs.times_s[k + 1]]
         t_k = inputs.times_s[k]

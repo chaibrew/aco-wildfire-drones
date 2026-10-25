@@ -1,5 +1,3 @@
-"""Command-line setup, inspection, continuous fires and reproducible simulation runs."""
-
 import argparse
 import csv
 import json
@@ -78,7 +76,6 @@ def run(args):
                      radius_m=args.radius, patches=args.patches, seed=args.seed))
                     if k >= args.perturb_stage else p for k, p in enumerate(sequence)]
     grid = Grid(cell_size_m=args.cell_size, base_revisit_s=args.revisit, seed=args.seed)
-    # Initial depot is fixed from first geometry, avoiding lookahead to future extent.
     xmin, ymin, _, _ = sequence[0].geometry.bounds
     depot = (xmin - args.cell_size, ymin - args.cell_size)
     env = Environment([Drone(i, *depot) for i in range(args.drones)],

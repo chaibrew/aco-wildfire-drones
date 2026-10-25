@@ -1,14 +1,3 @@
-"""Hourly fire weather from the Open-Meteo historical archive (ERA5 reanalysis).
-
-Weather enters the spread model twice per inter-snapshot interval:
-- pacing: the fraction of the interval's growth completed by each hour follows the
-  cumulative Fosberg Fire Weather Index (FFWI; Fosberg 1978) raised to an
-  exponent. Observed FEDS growth is more strongly diurnal than FFWI itself,
-  so the exponent is fitted by leave-one-snapshot-out validation;
-- shape: the FFWI-weighted vector-mean wind sets the spread ellipse. Shifting
-  winds cancel in the vector mean and give a rounder fire.
-"""
-
 import json
 import math
 import urllib.parse
@@ -26,7 +15,6 @@ VARIABLES = ("temperature_2m", "relative_humidity_2m", "wind_speed_10m", "wind_d
 
 
 def fetch_hourly(lat, lon, start, end, cache_dir="data/cache/weather"):
-    """Download (once) and cache hourly UTC weather for the inclusive date range."""
     cache = Path(cache_dir) / f"{lat:.3f}_{lon:.3f}_{start:%Y%m%d}_{end:%Y%m%d}.json"
     if not cache.exists():
         query = urllib.parse.urlencode({
@@ -43,7 +31,6 @@ def fetch_hourly(lat, lon, start, end, cache_dir="data/cache/weather"):
 
 
 def equilibrium_moisture(temp_c, rh):
-    """Simard (1968) equilibrium moisture content (%), as used by Fosberg."""
     t = np.asarray(temp_c) * 9 / 5 + 32
     h = np.asarray(rh, dtype=float)
     return np.select(
@@ -54,7 +41,6 @@ def equilibrium_moisture(temp_c, rh):
 
 
 def ffwi(temp_c, rh, wind_mps):
-    """Fosberg Fire Weather Index (0 to ~100) from temperature, humidity and wind."""
     m = np.clip(equilibrium_moisture(temp_c, rh), 0, 30) / 30
     eta = 1 - 2 * m + 1.5 * m ** 2 - 0.5 * m ** 3
     mph = np.asarray(wind_mps) * 2.236936
@@ -63,15 +49,14 @@ def ffwi(temp_c, rh, wind_mps):
 
 @dataclass(frozen=True)
 class Weather:
-    """Hourly series on a clock of seconds after t0 (UTC)."""
     t0: datetime
     times_s: np.ndarray
     temp_c: np.ndarray
     rh: np.ndarray
     wind_mps: np.ndarray
     wind_from_deg: np.ndarray
-    floor: float = 1.0  # keeps calm, humid hours from stopping the fire entirely
-    exponent: float = 1.0  # growth weight = FFWI**exponent + floor
+    floor: float = 1.0
+    exponent: float = 1.0
 
     @classmethod
     def from_open_meteo(cls, payload, t0, floor=1.0, exponent=1.0):
@@ -90,7 +75,6 @@ class Weather:
         return ffwi(self.temp_c, self.rh, self.wind_mps)
 
     def drivers(self, start_s, end_s, samples=64):
-        """Wind and pacing curve for one inter-snapshot interval."""
         if not (self.times_s[0] <= start_s and end_s <= self.times_s[-1]):
             raise ValueError("Weather series does not cover the snapshot interval")
         inside = self.times_s[(self.times_s > start_s) & (self.times_s < end_s)]
@@ -99,7 +83,6 @@ class Weather:
         weight = np.interp(clock, self.times_s, self.index) ** self.exponent + self.floor
         cumulative = np.concatenate([[0], np.cumsum(np.diff(clock) * (weight[1:] + weight[:-1]) / 2)])
         fraction = cumulative / cumulative[-1]
-        # Wind blows *from* wind_from_deg; fire is pushed the opposite way.
         rad = np.radians(self.wind_from_deg)
         east = np.interp(clock, self.times_s, -np.sin(rad) * self.wind_mps)
         north = np.interp(clock, self.times_s, -np.cos(rad) * self.wind_mps)
@@ -111,7 +94,6 @@ class Weather:
 
 
 def _fill(values):
-    """Linear fill of occasional missing hours."""
     good = np.isfinite(values)
     if good.all():
         return values
@@ -120,12 +102,6 @@ def _fill(values):
 
 
 def overpass_utc(label, lon):
-    """Approximate VIIRS overpass time for a FEDS half-day label.
-
-    FEDS labels snapshots T00:00 (night pass) and T12:00 (day pass). Suomi NPP
-    crosses at ~01:30 and ~13:30 local solar time; local solar = UTC + lon/15 h.
-    Accurate to roughly +/-1 h, which is small against the 12 h interval.
-    """
     hours = 1.5 if label.hour < 12 else 13.5
     day = datetime(label.year, label.month, label.day, tzinfo=timezone.utc)
     return day + timedelta(hours=hours - lon / 15)

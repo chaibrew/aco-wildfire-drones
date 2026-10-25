@@ -23,14 +23,13 @@ def payload(hours=48, wind_from=0.0, speed=None):
 
 def test_ffwi_rises_with_wind_and_dryness():
     assert ffwi(25, 20, 10) > ffwi(25, 20, 2) > ffwi(25, 60, 2)
-    # Fosberg's normalisation: bone-dry fuel and 30 mph-equivalent wind ~ 100.
     assert ffwi(40, 0, 30 / 2.236936) == pytest.approx(100, rel=0.1)
     m = equilibrium_moisture([20, 20, 20, 20], [9.99, 10.0, 49.99, 50.0])
     assert abs(m[0] - m[1]) < 0.5 and abs(m[2] - m[3]) < 0.5
 
 
 def test_drivers_wind_direction_and_pacing():
-    weather = Weather.from_open_meteo(payload(wind_from=0.0), T0)  # northerly wind
+    weather = Weather.from_open_meteo(payload(wind_from=0.0), T0)
     d = weather.drivers(3600, 3600 + DAY)
     assert d.wind_to == pytest.approx((0.0, -1.0), abs=1e-9)
     assert d.wind_mps == pytest.approx(5.0)
@@ -40,7 +39,7 @@ def test_drivers_wind_direction_and_pacing():
 
 
 def test_pacing_follows_fire_weather_and_exponent():
-    speed = [1.0] * 6 + [12.0] * 6 + [1.0] * 36  # windy hours 6-11
+    speed = [1.0] * 6 + [12.0] * 6 + [1.0] * 36
     for exponent, minimum in ((1.0, 0.5), (3.0, 0.9)):
         weather = Weather.from_open_meteo(payload(speed=speed), T0, exponent=exponent)
         d = weather.drivers(0, DAY)
@@ -66,7 +65,6 @@ def test_dem_tile_names():
 
 @pytest.fixture
 def eastward_fire():
-    """Fire grows only to the east: the west perimeter is inactive."""
     raster = Raster.covering((-3000, -3000, 4000, 3000), 50, 500)
     start = Point(0, 0).buffer(1000, 128)
     geoms = [start, start.union(box(0, -800, 3000, 800))]
@@ -99,6 +97,6 @@ def test_monitor_rejects_times_outside_observations(eastward_fire):
     monitor = FrontMonitor(eastward_fire)
     with pytest.raises(ValueError):
         monitor.points(DAY + 1)
-    assert monitor.points(DAY) == {}  # nothing left to advance into
+    assert monitor.points(DAY) == {}
     with pytest.raises(ValueError):
         FrontMonitor(eastward_fire, rate_tiers_mpm=(5.0, 1.0))

@@ -1,5 +1,3 @@
-"""Figures for continuous fires: arrival-time map, growth curve, active front, animation."""
-
 import numpy as np
 
 
@@ -31,7 +29,6 @@ def _points(ax, points, size=14):
 
 
 def plot_fire(field, sequence, monitor, output):
-    """Arrival-time map with FEDS outlines, growth curve, active front, active point count."""
     plt = _plt()
     hours = np.where(np.isfinite(field.arrival_s), field.arrival_s / 3600, np.nan)
     fig, axes = plt.subplots(2, 2, figsize=(13, 10), layout="constrained")
@@ -77,7 +74,6 @@ def plot_fire(field, sequence, monitor, output):
 
 
 def animate(field, monitor, output, step_s=1800, max_frames=120, fps=8):
-    """GIF of the burning area and active monitoring points."""
     plt = _plt()
     from matplotlib.animation import FuncAnimation, PillowWriter
     times = np.arange(field.start_s, field.end_s + 1, step_s)[:max_frames]
@@ -106,7 +102,6 @@ def _snapshot_lines(ax, field, hours_range):
 
 
 def plot_mission(field, rows, output):
-    """Map vs truth over a mission (dotted lines = FEDS snapshots)."""
     plt = _plt()
     hours = np.array([r["time_s"] for r in rows]) / 3600
     span = (hours[0], hours[-1])
@@ -134,7 +129,6 @@ def plot_mission(field, rows, output):
 
 
 def animate_mission(field, rows, frames, output, fps=6):
-    """True fire, what the fleet knows, monitoring points and planned routes."""
     plt = _plt()
     from matplotlib.animation import FuncAnimation, PillowWriter
     fig, ax = plt.subplots(figsize=(7, 7), layout="constrained")

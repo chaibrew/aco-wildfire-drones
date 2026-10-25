@@ -16,7 +16,6 @@ DAY = 43200.0
 
 @pytest.fixture(scope="module")
 def field():
-    """Fire that only grows east over two 12 h intervals."""
     raster = Raster.covering((-2000, -2000, 7000, 2000), 100, 1000)
     start = Point(0, 0).buffer(1000, 64)
     geoms = [start, start.union(box(0, -600, 3000, 600)), start.union(box(0, -600, 6000, 600))]
