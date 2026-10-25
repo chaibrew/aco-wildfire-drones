@@ -165,7 +165,7 @@ field, sequence = load_fire(path, *, fire_id, year=None, limit=None, crs=None, r
                             model=SpreadModel(), weather=True, terrain=True, convention="overpass")
 ```
 
-Provenance records where the data came from, so that another person can repeat a run. `fire-sim` writes it into `field.json` and `config.json`.
+Provenance records where the data came from, so that another person can repeat a run. `fire-sim` writes it into `field.json` and `run.json`.
 
 `load_feds` raises `ValueError` for: no records for the fire, a fire ID in more than one year without `year`, no CRS, missing columns, missing times, empty geometry, invalid geometry with `repair=False`, non-polygon geometry, or a target CRS that is not in metres.
 

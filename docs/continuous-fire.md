@@ -139,7 +139,7 @@ Results:
 - Most of the improvement comes from the weather pacing. Wind shape and slope each change IoU by approximately 0.02.
 - No method recovers the 12-hour growth accurately (IoU 0.3 to 0.5). The simulation needs only a possible fire between snapshots. It always agrees with the snapshots.
 
-To repeat the check, use `fire-sim fire ... --validate`. The result is in `validation.csv`.
+To repeat the check, set `validate = true` in `[output]` and run `fire-sim fire`. The result is in `validation.csv`.
 
 ## References
 

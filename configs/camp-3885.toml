@@ -1,0 +1,35 @@
+[data]
+path = "data/raw/LargeFires_2018.gpkg"
+fire_id = 3885
+year = 2018
+limit = 8
+
+[fire]
+res_m = 100.0
+seed = 0
+noise_sigma = 0.3
+weather = true
+terrain = true
+time_convention = "overpass"
+
+[mission]
+cell_size_m = 1000.0
+sensor_radius_m = 1000.0
+base_revisit_s = 900.0
+rate_tiers_mpm = [2.0, 10.0]
+drones = 6
+speed_mps = 15.0
+service_s = 5.0
+horizon_s = 600.0
+
+[run]
+start_h = 0.0
+duration_h = 24.0
+
+[output]
+fire_dir = "outputs/fire-3885"
+mission_dir = "outputs/mission-3885"
+gif = true
+gif_step_h = 0.5
+gif_every = 3
+validate = false

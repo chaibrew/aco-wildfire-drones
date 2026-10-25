@@ -30,17 +30,10 @@ FEDS tracks fire perimeters at 12 hour intervals. `fire-sim fire` makes a contin
 - The command downloads weather (Open-Meteo, ERA5) and elevation (Copernicus GLO-30) one time for each fire. It keeps them in `data/cache/`.
 
 ```sh
-fire-sim fire data/raw/LargeFires_2018.gpkg --fire-id 3885 --year 2018 --limit 8 --gif \
-  --output outputs/fire-3885
+fire-sim fire configs/camp-3885.toml
 ```
 
-| Option | Function |
-| --- | --- |
-| `--seed`, `--noise` | Change the random spread variation. |
-| `--no-weather`, `--no-terrain` | Remove weather or slope from the spread. |
-| `--validate` | Do a leave-one-snapshot-out check. |
-
-Output: `field.npz` and `field.json` (the fire), `fire.png`, `fire.gif` (with `--gif`), `validation.csv` (with `--validate`).
+Output in `[output] fire_dir`: `field.npz` and `field.json` (the fire), `fire.png`, `fire.gif` (if `gif = true`), `validation.csv` (if `validate = true`), and a copy of the config.
 
 ## Drone mission
 
@@ -52,20 +45,38 @@ Output: `field.npz` and `field.json` (the fire), `fire.png`, `fire.gif` (with `-
 The monitoring points are the grid cells on the mapped perimeter. The risk of a point comes from the observed spread rate. For each stage, the mission calculates J two times: on the fleet map and on the true active front.
 
 ```sh
-fire-sim mission data/raw/LargeFires_2018.gpkg --fire-id 3885 --year 2018 --limit 8 \
-  --duration-h 24 --drones 6 --cell-size 1000 --gif --output outputs/mission-3885
+fire-sim mission configs/camp-3885.toml
 ```
 
-| Option | Function | Default |
-| --- | --- | --- |
-| `--cell-size` | Monitoring grid cell (m) | 500 |
-| `--sensor-radius` | Drone sensor radius (m) | cell size |
-| `--rate-tiers LOW HIGH` | Spread rate (m/min) for risk 2 and risk 3 | 2 10 |
-| `--revisit` | Base revisit period q (s). q = base / risk. | 900 |
-| `--horizon` | Time between replans (s) | 600 |
-| `--drones`, `--speed`, `--service` | Fleet size, speed (m/s), observation time (s) | 3, 15, 5 |
+Output in `[output] mission_dir`: `metrics.csv` (one row for each stage), `run.json` (the full config and the fire provenance), `mission.png`, `mission.gif` (if `gif = true`), and a copy of the config.
 
-Output: `metrics.csv` (one row for each stage), `config.json`, `mission.png`, `mission.gif` (with `--gif`).
+## Configuration
+
+Both commands read one TOML file. Copy [configs/camp-3885.toml](configs/camp-3885.toml) and change the values. If you remove a key, the default applies. An unknown key causes an error.
+
+| Section | Key | Default | Function |
+| --- | --- | --- | --- |
+| `[data]` | `path` | required | FEDS GeoPackage |
+| | `fire_id` | required | FEDS fire ID |
+| | `year` | none | Necessary if the fire ID occurs in more than one year |
+| | `limit` | all | Use only the first N snapshots |
+| | `crs` | UTM from first perimeter | Metric CRS, for example `"EPSG:32610"` |
+| `[fire]` | `res_m` | 100.0 | Fire grid cell (m) |
+| | `seed`, `noise_sigma` | 0, 0.3 | Random spread variation. 0 removes it. |
+| | `weather`, `terrain` | true, true | Use weather or slope in the spread |
+| | `time_convention` | `"overpass"` | `"overpass"`: satellite times. `"label"`: FEDS labels as UTC. |
+| `[mission]` | `cell_size_m` | 500.0 | Monitoring grid cell (m) |
+| | `sensor_radius_m` | cell size | Drone sensor radius (m) |
+| | `base_revisit_s` | 900.0 | Base revisit period. q = base / risk. |
+| | `rate_tiers_mpm` | [2.0, 10.0] | Spread rate (m/min) for risk 2 and risk 3 |
+| | `drones`, `speed_mps`, `service_s` | 3, 15.0, 5.0 | Fleet size, speed (m/s), observation time (s) |
+| | `horizon_s` | 600.0 | Time between replans (s) |
+| `[run]` | `start_h` | 0.0 | Mission start, hours after the first snapshot |
+| | `duration_h` | to last snapshot | Mission length (h) |
+| `[output]` | `fire_dir`, `mission_dir` | `outputs/fire`, `outputs/mission` | Output folders |
+| | `gif` | false | Make animations |
+| | `gif_step_h`, `gif_every` | 0.5, 3 | Fire frame step (h), mission stages for each frame |
+| | `validate` | false | Do the leave-one-snapshot-out check (`fire` only) |
 
 ## Connect a planner
 
