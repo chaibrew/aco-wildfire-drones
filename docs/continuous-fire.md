@@ -34,18 +34,33 @@ Edge cost is `length / rate`, with a relative directional rate built from three 
 
 **What physics can and cannot change.** The snapshots already record how far the fire went in each direction. A speed-up that is uniform along a path cancels in the ratio. Physics reshapes timing where speed varies along a path (steep then flat terrain, heterogeneity), where the fastest way in and out differ (flanks under wind), and through the weather pacing.
 
-## Monitoring points
+## Ground truth vs what the fleet knows
 
-`FrontMonitor.points(t)` returns the same `{cell_id: MonitoringPoint}` structure as `Grid.points`, on the same fixed world grid (default 500 m), so the planner contract is unchanged.
+The ArrivalField is ground truth and is never shown to a planner. `run_mission` keeps the two apart.
 
-- A fine cell is on the perimeter if it has burned and a 4-neighbour has not.
-- It is on the **active front** if that neighbour burns before the next FEDS observation.
-- The front rate of a monitoring cell is the fastest such neighbour's spread rate, `1/|∇T|`.
-- Risk tiers come from the front rate: below 2 m/min → 1, 2–10 m/min → 2, above 10 m/min → 3. Revisit period `q = base / risk`.
+**Fleet map (`FireMap`).** This is the planner's only input.
+- **At FEDS observations:** the planner learns the observed area (the true burned area at the snapshot time), after an optional latency.
+- **From drones:** an observation finishing at (x, y, t) reveals the true burned state within the sensor radius R (default: the cell size) at time t.
+- **Unobserved ground:** assumed unchanged since it was last seen. When the fire outruns a footprint, the map only knows "burned up to here", so drones chase the front. Undiscovered spot fires stay invisible until a drone passes or the next snapshot arrives.
+- **Monitoring points:** grid cells on the mapped perimeter (whole perimeter, not just the active part).
+- **Risk:** taken from the newest spread evidence for the cell.
+  - A snapshot gives the distance each newly burned cell lies beyond the previous snapshot, divided by the interval.
+  - A drone gives the distance newly seen fire lies beyond the previously known fire, divided by the time since that spot was last observed.
+  - Looking and seeing no advance records zero.
+  - Tiers: below 2 m/min → 1, 2–10 → 2, above 10 → 3. `q = base / risk`.
 
-The active set drifts between observations. For the Camp Fire at 500 m: median 4% of points change per 10-minute replan, 90th percentile 14%. It shifts substantially at each FEDS observation time (up to ~90%), because each interval has its own growth band. That gives the experiments natural small-local and large-widespread change events. A fixed look-ahead window (`--active-window-h`) is available, but it churned more in pilot runs.
+**Footprints in planning.** `PlanningState.coverage` lists, for each point, every point within R of it. A visit observes them all, so `evaluate` credits nearby points too.
 
-**Change sets for replay.** `grid.changes(previous, current)` reports cells that were added, removed, or whose risk tier changed. Unlike `perimeter_changes`, sub-cell boundary movement is ignored. Routing only sees cell centres and revisit periods, and almost every active cell moves a little every replan.
+**Truth score.** The true active front is found with `FrontMonitor`: perimeter cells where fire reaches a neighbour before the next observation.
+- A true cell counts as observed whenever it lies within R of any drone visit.
+- A satellite snapshot counts as observing everything at its observation time.
+- `true_objective` is J over these cells, so fire the fleet has not discovered goes overdue.
+- `front_on_map_fraction` is the share of true front cells that are on the map.
+
+**Change pattern (Camp Fire, 24 h, 6 drones, smoke router, 1 km cells).**
+- Median 6% of points change per 10-minute replan, driven by drone discoveries.
+- 80% change when a snapshot lands.
+- `front_on_map_fraction` falls to about 0.8 before an observation, then resets to 1.
 
 ## Validation: leave one snapshot out
 

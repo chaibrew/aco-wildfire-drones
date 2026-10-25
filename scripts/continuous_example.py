@@ -1,36 +1,30 @@
-"""Planner hook on a continuous fire: replace smoke_router with ACO/greedy/VNS.
+"""Planner hook: a router sees only the fleet's map through PlanningState."""
 
-Run after `fire-sim fire data/raw/LargeFires_2018.gpkg --fire-id 3885 --year 2018 --limit 8`
-(or let load_fire build and cache the field on first use).
-"""
-
-from fire_sim import Drone, Environment, changes, evaluate
 from fire_sim.fire import load_fire
-from fire_sim.monitor import FrontMonitor
-from fire_sim.simulation import smoke_router
+from fire_sim.mission import MissionConfig, run_mission
+from fire_sim.simulation import evaluate, smoke_router
 
-HORIZON_S = 600
+
+class Router:
+    def __init__(self):
+        self.previous = set()
+
+    def __call__(self, state):
+        current = set(state.points)
+        added, removed = current - self.previous, self.previous - current
+        # ACO hook: remap pheromone by stable cell IDs, delete edges of `removed`,
+        # reset or keep edges of `added` and risk-changed points per strategy.
+        routes = smoke_router(state)
+        print(f"t={state.time_s / 3600:4.1f}h points={len(current):3d} +{len(added):3d} -{len(removed):3d} "
+              f"J_map={evaluate(state, routes).objective:.2f}")
+        self.previous = current
+        return routes
 
 
 def main():
     field, _ = load_fire("data/raw/LargeFires_2018.gpkg", fire_id=3885, year=2018, limit=8, pacing_exponent=2.0)
-    monitor = FrontMonitor(field, cell_size_m=1000)
-    xmin, ymin, _, _ = field.perimeter(field.start_s).bounds
-    env = Environment([Drone(i, xmin, ymin) for i in range(6)])
-    env.time_s = field.start_s
-    previous = {}
-    for _ in range(12):  # two hours
-        points = monitor.points(env.time_s)
-        delta = changes(previous, points)
-        env.activate(points)
-        state = env.state(HORIZON_S)
-        # ACO hook: remap pheromone by stable cell IDs; delta.affected_current is C_t
-        # for selective reset, delta.removed must have its edges deleted.
-        routes = smoke_router(state)
-        assert evaluate(state, routes).objective == env.step(routes, HORIZON_S).objective
-        print(f"t={state.time_s / 3600:4.1f}h points={len(points):3d} "
-              f"C_t={len(delta.affected_current):3d} removed={len(delta.removed):2d}")
-        previous = points
+    rows = run_mission(field, Router(), MissionConfig(cell_size_m=1000, drones=6), stop_s=2 * 3600)
+    print(f"true-front J at end: {rows[-1]['true_objective']:.2f}, front on map: {rows[-1]['front_on_map_fraction']:.0%}")
 
 
 if __name__ == "__main__":

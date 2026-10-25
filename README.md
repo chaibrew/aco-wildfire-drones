@@ -28,23 +28,33 @@ python -m pip install --no-deps -e .
 
 `requirements.lock` pins the versions used during setup. `pyproject.toml` contains the supported dependency ranges. GIS dependencies install from wheels on supported platforms. No separate QGIS application or fire-spread engine is needed.
 
-### Continuous fire (FEDS + weather + terrain)
+### Continuous fire and drone missions
 
-FEDS only observes the fire every ~12 hours. `fire-sim fire` turns a FEDS sequence into a continuous fire: an arrival time for every 100 m cell, filled in between snapshots by shortest-time spread through a wind/slope rate field and paced hour by hour by fire weather. Every observed snapshot is reproduced exactly. Weather (Open-Meteo/ERA5) and elevation (Copernicus GLO-30) are downloaded once per fire into `data/cache/`. See [the model write-up and validation](docs/continuous-fire.md).
+FEDS only observes the fire every ~12 hours. `fire-sim fire` turns a FEDS sequence into a continuous **ground-truth** fire: an arrival time for every 100 m cell. The gaps between snapshots are filled by shortest-time spread through a wind/slope rate field, paced hour by hour by fire weather. Every observed snapshot is reproduced exactly. Weather (Open-Meteo/ERA5) and elevation (Copernicus GLO-30) are downloaded once per fire into `data/cache/`.
+
+`fire-sim mission` flies drones over that fire, but **planners never see the ground truth**. They see only the fleet's own map:
+- the latest FEDS snapshot, which arrives every ~12 hours (optionally delayed);
+- whatever drones observe within their sensor radius when they visit a point.
+
+Monitoring points are the cells on the mapped perimeter. Risk comes from observed spread: growth in the last snapshot interval, or advance a drone measured since the area was last seen. Each stage is scored twice: J on the map (what the planner optimised) and J on the true active front (what actually needed watching). The run also reports how much of the true front is on the map.
+
+See [the model write-up](docs/continuous-fire.md).
 
 ```sh
-# Build, plot and animate 4 days of the Camp Fire; --validate adds the leave-one-out check.
-fire-sim fire data/raw/LargeFires_2018.gpkg --fire-id 3885 --year 2018 --limit 8 --gif --validate \
+# Build, plot and animate 4 days of the Camp Fire (ground truth).
+fire-sim fire data/raw/LargeFires_2018.gpkg --fire-id 3885 --year 2018 --limit 8 --gif \
   --output outputs/fire-3885
 
-# Real-time replay: replan every 600 s for 24 h on the active front, 6 drones, 1 km cells.
-fire-sim replay data/raw/LargeFires_2018.gpkg --fire-id 3885 --year 2018 --limit 8 \
-  --duration-h 24 --drones 6 --cell-size 1000 --output outputs/replay-3885
+# 24 h mission: 6 drones replanning every 600 s, 1 km cells, 1 km sensor radius.
+fire-sim mission data/raw/LargeFires_2018.gpkg --fire-id 3885 --year 2018 --limit 8 \
+  --duration-h 24 --drones 6 --cell-size 1000 --gif --output outputs/mission-3885
 ```
 
-Useful options: `--seed` and `--noise` (different but snapshot-consistent runs), `--no-weather`, `--no-terrain`, `--pacing-exponent`, `--whole-perimeter` (monitor every edge cell, not just the active front), and `--rate-tiers LOW HIGH` (m/min thresholds for risk tiers 2 and 3).
+**Fire options:** `--seed` and `--noise` (different but snapshot-consistent fires), `--no-weather`, `--no-terrain`, `--pacing-exponent`, `--validate` (leave-one-snapshot-out check).
 
-In replay, time is real seconds. Monitoring points are grid cells on the actively spreading front, with risk from the current spread rate. The change set C_t contains cells that were added or removed, or whose risk tier changed. [scripts/continuous_example.py](scripts/continuous_example.py) shows the planner hook.
+**Mission options:** `--sensor-radius`, `--snapshot-latency-h`, `--rate-tiers LOW HIGH` (m/min thresholds for risk tiers 2 and 3), `--horizon`, `--drones`, `--speed`.
+
+[scripts/continuous_example.py](scripts/continuous_example.py) shows the planner hook.
 
 ### Run real FEDS data (snapshot replay)
 

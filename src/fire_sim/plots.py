@@ -99,18 +99,62 @@ def animate(field, monitor, output, step_s=1800, max_frames=120, fps=8):
     plt.close(fig)
 
 
-def plot_replay(rows, output):
+def _snapshot_lines(ax, field, hours_range):
+    for snap in field.snapshot_s:
+        if hours_range[0] <= snap / 3600 <= hours_range[1]:
+            ax.axvline(snap / 3600, color="grey", linewidth=0.6, linestyle=":")
+
+
+def plot_mission(field, rows, output):
+    """Map vs truth over a mission (dotted lines = FEDS snapshots)."""
     plt = _plt()
     hours = np.array([r["time_s"] for r in rows]) / 3600
-    fig, axes = plt.subplots(3, 1, figsize=(11, 9), sharex=True, layout="constrained")
-    axes[0].plot(hours, [r["active_points"] for r in rows], label="active")
-    axes[0].plot(hours, [r["affected_current"] for r in rows], label="affected C_t")
-    axes[0].set(ylabel="Points")
-    axes[0].legend()
-    axes[1].plot(hours, [r["affected_union_fraction"] for r in rows], color="#b44627")
-    axes[1].set(ylabel="Changed fraction")
-    axes[2].plot(hours, [r["objective"] for r in rows], color="black")
-    axes[2].set(ylabel="J_overdue", xlabel="Hours after first snapshot")
-    fig.suptitle("Replay with smoke_router (plumbing check, not a baseline)")
+    span = (hours[0], hours[-1])
+    fig, axes = plt.subplots(4, 1, figsize=(11, 11), sharex=True, layout="constrained")
+    axes[0].plot(hours, [r["map_points"] for r in rows], label="points on fleet map (planned)")
+    axes[0].plot(hours, [r["true_front_points"] for r in rows], label="true active-front cells")
+    axes[0].plot(hours, [r["affected_current"] for r in rows], label="C_t (added or risk changed)")
+    axes[0].set(ylabel="Cells")
+    axes[0].legend(fontsize=8)
+    axes[1].plot(hours, [r["front_on_map_fraction"] for r in rows], label="true front cells on map")
+    axes[1].plot(hours, [r["known_burned_fraction"] for r in rows], label="burned area known")
+    axes[1].set(ylabel="Fraction", ylim=(0, 1.02))
+    axes[1].legend(fontsize=8)
+    axes[2].plot(hours, [r["affected_union_fraction"] for r in rows], color="#b44627")
+    axes[2].set(ylabel="Changed fraction")
+    axes[3].plot(hours, [r["map_objective"] for r in rows], label="J on fleet map")
+    axes[3].plot(hours, [r["true_objective"] for r in rows], label="J on true front")
+    axes[3].set(ylabel="J_overdue", xlabel="Hours after first snapshot")
+    axes[3].legend(fontsize=8)
+    for ax in axes:
+        _snapshot_lines(ax, field, span)
+    fig.suptitle("Mission with smoke_router (plumbing check, not a baseline)")
     fig.savefig(output, dpi=140)
+    plt.close(fig)
+
+
+def animate_mission(field, rows, frames, output, fps=6):
+    """True fire, what the fleet knows, monitoring points and planned routes."""
+    plt = _plt()
+    from matplotlib.animation import FuncAnimation, PillowWriter
+    fig, ax = plt.subplots(figsize=(7, 7), layout="constrained")
+    extent = _extent(field.raster)
+
+    def frame(item):
+        stage, known, points, routes = item
+        t = rows[stage]["time_s"]
+        ax.clear()
+        truth = field.arrival_s <= t
+        layer = np.where(known & truth, 1.0, np.where(truth, 2.0, np.nan))
+        ax.imshow(layer, origin="lower", extent=extent, cmap="Oranges", vmin=0, vmax=2.4, interpolation="nearest")
+        for route in routes.values():
+            if route:
+                ax.plot([points[i].x / 1000 for i in route], [points[i].y / 1000 for i in route],
+                        color="steelblue", linewidth=0.6, alpha=0.7)
+        _points(ax, points, size=12)
+        ax.set(xlim=extent[:2], ylim=extent[2:], aspect="equal", xlabel="x (km)", ylabel="y (km)",
+               title=f"t = {t / 3600:5.1f} h   front on map {rows[stage]['front_on_map_fraction']:.0%}\n"
+                     "light = known burned, dark = burned but unknown, dots = planned points")
+
+    FuncAnimation(fig, frame, frames=frames).save(output, writer=PillowWriter(fps=fps))
     plt.close(fig)

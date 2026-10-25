@@ -3,6 +3,8 @@
 import math
 from dataclasses import dataclass
 
+import numpy as np
+
 from .models import CellId, MonitoringPoint
 
 
@@ -22,6 +24,7 @@ class PlanningState:
     drones: tuple[Drone, ...]
     points: dict[CellId, MonitoringPoint]
     last_seen: dict[CellId, float]
+    coverage: dict[CellId, tuple[CellId, ...]] | None = None
 
 
 @dataclass
@@ -35,6 +38,7 @@ class Evaluation:
     gaps_s: dict
     observations: dict
     end_drones: tuple
+    visits: list
 
     def summary(self):
         return {key: getattr(self, key) for key in (
@@ -51,7 +55,8 @@ def evaluate(state: PlanningState, routes: dict[int, list[CellId]]) -> Evaluatio
     if set(routes) != {d.id for d in state.drones}:
         raise ValueError("Provide exactly one route (possibly empty) per drone")
     observations = {i: [] for i in state.points}
-    distances, end_drones = [], []
+    coverage = state.coverage or {}
+    distances, end_drones, visits = [], [], []
     end = state.time_s + state.horizon_s
     for drone in state.drones:
         x, y, clock, distance = drone.x, drone.y, state.time_s, 0.0
@@ -63,28 +68,49 @@ def evaluate(state: PlanningState, routes: dict[int, list[CellId]]) -> Evaluatio
             clock += leg / state.speed_mps + state.service_s
             if clock > end + 1e-9:
                 raise ValueError(f"Drone {drone.id} route exceeds horizon")
-            observations[i].append(min(clock, end))
+            for j in coverage.get(i, (i,)):
+                observations[j].append(min(clock, end))
+            visits.append((min(clock, end), drone.id, i))
             distance += leg
             x, y = point.x, point.y
         distances.append(distance)
         end_drones.append(Drone(drone.id, x, y))
+    metrics = gap_metrics(state.points, state.last_seen, observations, end)
+    return Evaluation(metrics["objective"], metrics["overdue_count"], metrics["mean_gap_s"],
+                      metrics["max_gap_s"], sum(distances), max(distances, default=0.0),
+                      metrics["gaps_s"], metrics["observations"], tuple(end_drones), sorted(visits))
+
+
+def gap_metrics(points, last_seen, observations, end):
+    """Longest unobserved interval P_i per point and J = max_i max(0, P_i / q_i - 1).
+
+    Observations are deduplicated and sorted in place. Gaps run from the last
+    observation (or activation) through every observation to the window end.
+    """
     gaps = {}
-    for i in state.points:
-        visits = sorted(set(observations[i]))
+    for i in points:
+        visits = sorted(set(observations.get(i, [])))
         observations[i] = visits
-        # Preserve overdue age across replanning; new points start at activation.
-        boundaries = [state.last_seen[i], *visits, end]
+        boundaries = [last_seen[i], *visits, end]
         gaps[i] = max(b - a for a, b in zip(boundaries, boundaries[1:]))
-    overdue = {i: max(0.0, gap / state.points[i].revisit_s - 1) for i, gap in gaps.items()}
-    return Evaluation(max(overdue.values(), default=0.0),
-                      sum(v > 0 for v in overdue.values()),
-                      sum(gaps.values()) / max(1, len(gaps)), max(gaps.values(), default=0.0),
-                      sum(distances), max(distances, default=0.0), gaps, observations,
-                      tuple(end_drones))
+    overdue = {i: max(0.0, gap / points[i].revisit_s - 1) for i, gap in gaps.items()}
+    return {"objective": max(overdue.values(), default=0.0),
+            "overdue_count": sum(v > 0 for v in overdue.values()),
+            "mean_gap_s": sum(gaps.values()) / max(1, len(gaps)),
+            "max_gap_s": max(gaps.values(), default=0.0), "gaps_s": gaps, "observations": observations}
+
+
+def coverage(points, radius_m):
+    ids = sorted(points)
+    if not ids:
+        return {}
+    xy = np.array([(points[i].x, points[i].y) for i in ids])
+    near = np.hypot(*(xy[:, None, :] - xy[None, :, :]).transpose(2, 0, 1)) <= radius_m + 1e-6
+    return {i: tuple(ids[j] for j in np.flatnonzero(row)) for i, row in zip(ids, near)}
 
 
 class Environment:
-    def __init__(self, drones, *, speed_mps=15.0, service_s=5.0):
+    def __init__(self, drones, *, speed_mps=15.0, service_s=5.0, sensor_radius_m=0.0):
         self.drones = tuple(drones)
         if not self.drones or len({d.id for d in self.drones}) != len(self.drones):
             raise ValueError("Drones must have unique IDs and the fleet must be nonempty")
@@ -92,7 +118,9 @@ class Environment:
             raise ValueError("Drone coordinates must be finite")
         if not all(math.isfinite(v) and v > 0 for v in (speed_mps, service_s)):
             raise ValueError("Speed and service time must be finite and positive")
-        self.speed_mps, self.service_s = speed_mps, service_s
+        if not math.isfinite(sensor_radius_m) or sensor_radius_m < 0:
+            raise ValueError("Sensor radius must be finite and non-negative")
+        self.speed_mps, self.service_s, self.sensor_radius_m = speed_mps, service_s, sensor_radius_m
         self.time_s = 0.0
         self.points, self.last_seen = {}, {}
 
@@ -107,7 +135,13 @@ class Environment:
         if not math.isfinite(horizon_s) or horizon_s <= 0:
             raise ValueError("Horizon must be finite and positive")
         return PlanningState(self.time_s, horizon_s, self.speed_mps, self.service_s,
-                             self.drones, dict(self.points), dict(self.last_seen))
+                             self.drones, dict(self.points), dict(self.last_seen),
+                             coverage(self.points, self.sensor_radius_m) if self.sensor_radius_m else None)
+
+    def mark_observed(self, time_s, ids=None):
+        for i in self.points if ids is None else ids:
+            if i in self.last_seen:
+                self.last_seen[i] = max(self.last_seen[i], time_s)
 
     def step(self, routes, horizon_s):
         result = evaluate(self.state(horizon_s), routes)

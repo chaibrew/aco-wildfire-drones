@@ -191,69 +191,40 @@ def fire_command(args):
     print(json.dumps(report, indent=2, default=str))
 
 
-def replay_command(args):
-    from .grid import changes
-    from .plots import plot_replay
+def mission_command(args):
+    from .mission import MissionConfig, run_mission
+    from .plots import animate_mission, plot_mission
     field, _ = _load_field(args)
-    monitor = _monitor(field, args)
+    config = MissionConfig(cell_size_m=args.cell_size, sensor_radius_m=args.sensor_radius,
+                           base_revisit_s=args.revisit, rate_tiers_mpm=tuple(args.rate_tiers),
+                           snapshot_latency_s=args.snapshot_latency_h * 3600, drones=args.drones,
+                           speed_mps=args.speed, service_s=args.service, horizon_s=args.horizon)
     start = field.start_s + args.start_h * 3600
-    stop = field.end_s if args.duration_h is None else min(field.end_s, start + args.duration_h * 3600)
-    if not field.start_s <= start < stop:
-        raise ValueError("start must lie inside the observed span")
-    first = field.perimeter(start)
-    xmin, ymin, _, _ = first.bounds  # depot from the fire at the start time only
-    depot = (xmin - args.cell_size, ymin - args.cell_size)
-    env = Environment([Drone(i, *depot) for i in range(args.drones)],
-                      speed_mps=args.speed, service_s=args.service)
-    env.time_s = start
-    rows, stages, previous = [], [], {}
-    stage = 0
-    while env.time_s + 1e-9 < stop:
-        t = env.time_s
-        horizon = min(args.horizon, stop - t)
-        points = monitor.points(t)
-        delta = changes(previous, points)
-        env.activate(points)
-        state = env.state(horizon)
-        started = time.perf_counter()
-        routes = smoke_router(state)
-        planning_s = time.perf_counter() - started
-        result = env.step(routes, horizon)
-        rows.append({"stage": stage, "time_s": t, "horizon_s": horizon,
-                     "utc": (field.t0 + timedelta(seconds=t)).isoformat(),
-                     "next_observation_s": field.next_snapshot(t), "active_points": len(points),
-                     "added": len(delta.added), "removed": len(delta.removed), "changed": len(delta.changed),
-                     "affected_current": len(delta.affected_current),
-                     "affected_union_fraction": delta.fraction(previous, points) if stage else 1.0,
-                     "planning_s": planning_s, **result.summary()})
-        stages.append({"stage": stage, "time_s": t, "horizon_s": horizon,
-                       "points": [{**asdict(p), "last_seen_s": state.last_seen[i]} for i, p in points.items()],
-                       "drones": [asdict(d) for d in state.drones],
-                       "changes": {"added": sorted(delta.added), "removed": sorted(delta.removed),
-                                   "changed": sorted(delta.changed)},
-                       "routes": {str(i): r for i, r in routes.items()}})
-        previous, stage = points, stage + 1
+    stop = None if args.duration_h is None else start + args.duration_h * 3600
+    frames = []
+
+    def record(stage, fire_map, points, routes):
+        if args.gif and stage % args.gif_every == 0:
+            frames.append((stage, fire_map.known.copy(), dict(points), routes))
+
+    rows = run_mission(field, smoke_router, config, start_s=start, stop_s=stop, record=record)
     out = Path(args.output)
     out.mkdir(parents=True, exist_ok=True)
     with (out / "metrics.csv").open("w", newline="") as stream:
         writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
         writer.writeheader()
         writer.writerows(rows)
-    payload = {"schema_version": 2, "units": {"distance": "metres", "time": "seconds after first snapshot"},
-               "fire": {"t0_utc": field.t0.isoformat(), "snapshot_s": list(field.snapshot_s),
-                        "meta": field.meta}, "config": vars(args),
-               "priority_model": "risk tier from current front spread rate; q = base_revisit / risk",
-               "change_rule": "added/removed cells, or surviving cells whose risk tier changed",
-               "router": "smoke_router (not a validated experimental baseline)", "stages": stages}
-    (out / "scenario.json").write_text(json.dumps(payload, indent=1, default=str, allow_nan=False) + "\n")
-    plot_replay(rows, out / "replay.png")
+    (out / "config.json").write_text(json.dumps({"args": vars(args), "mission": asdict(config),
+                                                 "fire": field.meta}, indent=2, default=str) + "\n")
+    plot_mission(field, rows, out / "mission.png")
+    if args.gif:
+        animate_mission(field, rows, frames, out / "mission.gif")
     fractions = [r["affected_union_fraction"] for r in rows[1:]]
     print(json.dumps({"output": str(out.resolve()), "stages": len(rows),
-                      "points_min_median_max": [min(r["active_points"] for r in rows),
-                                                sorted(r["active_points"] for r in rows)[len(rows) // 2],
-                                                max(r["active_points"] for r in rows)],
+                      "map_points_median": sorted(r["map_points"] for r in rows)[len(rows) // 2],
                       "changed_fraction_median": sorted(fractions)[len(fractions) // 2] if fractions else None,
-                      "worst_objective": max(r["objective"] for r in rows)}, indent=2))
+                      "worst_true_objective": max(r["true_objective"] for r in rows),
+                      "mean_front_on_map": sum(r["front_on_map_fraction"] for r in rows) / len(rows)}, indent=2))
 
 
 def main():
@@ -284,9 +255,9 @@ def main():
         p.add_argument("--locality", choices=["local", "distributed"], default="local")
         p.add_argument("--radius", type=float, default=400.0, help="Growth patch radius in metres")
         p.add_argument("--patches", type=int, default=4)
-    for name in ("fire", "replay"):
+    for name in ("fire", "mission"):
         p = sub.add_parser(name, help={"fire": "Build a continuous fire from FEDS + weather + terrain",
-                                       "replay": "Replan drones every horizon on a continuous fire"}[name])
+                                       "mission": "Fly drones that plan on their own map of a hidden continuous fire"}[name])
         _fire_options(p)
         p.add_argument("--output", default=f"outputs/{name}")
         p.add_argument("--cell-size", type=float, default=500.0, help="Monitoring grid cell (m)")
@@ -306,14 +277,19 @@ def main():
             p.add_argument("--drones", type=int, default=3)
             p.add_argument("--speed", type=float, default=15.0, help="Metres per second")
             p.add_argument("--service", type=float, default=5.0, help="Seconds per observation")
+            p.add_argument("--sensor-radius", type=float, help="Drone footprint radius (m); default = cell size")
+            p.add_argument("--snapshot-latency-h", type=float, default=0.0,
+                           help="Hours before a FEDS snapshot reaches the planner")
+            p.add_argument("--gif", action="store_true")
+            p.add_argument("--gif-every", type=int, default=3, help="Stages per animation frame")
     args = parser.parse_args()
     try:
         if args.command == "inspect":
             print(json.dumps(inspect_file(args.path), indent=2, default=str))
         elif args.command == "fire":
             fire_command(args)
-        elif args.command == "replay":
-            replay_command(args)
+        elif args.command == "mission":
+            mission_command(args)
         else:
             run(args)
     except ValueError as error:
