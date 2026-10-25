@@ -1,71 +1,94 @@
-# Simulation contract and modelling decisions
+# Simulation contract
 
-These choices make the starter implementation precise. The group should agree on them before fixing experimental parameters.
+These rules apply to all planners. The group must agree on them before the experiments.
 
 ## Data flow
 
 ```text
-FEDS GeoPackage (perimeter layer; year + fireID)
-  -> sorted polygon snapshots in one projected metre CRS
-  -> fixed grid / active points / change sets
-  -> PlanningState -> ACO, greedy or VNS -> routes
-  -> pure candidate evaluation -> execute chosen routes
-  -> carry positions + observation history into next stage
+FEDS GeoPackage
+  -> perimeters in one metric CRS (load_feds)
+  -> ground-truth arrival-time fire (ArrivalField)
+  -> fleet map from snapshots and drone observations (FireMap)
+  -> PlanningState -> planner -> routes
+  -> evaluate -> Environment.step
+  -> drone observations update the fleet map
 ```
 
-`load_feds` returns a list of `Perimeter(timestamp, geometry)` and provenance. It retains polygon components and holes. Duplicate selected records at a timestamp are unioned, with the count recorded. Missing IDs, missing CRS, nonpolygon geometry, missing times and invalid geometry produce errors. Multi-year datasets require a year when a fire ID repeats. A single tracked FEDS ID is used; the adapter does not stitch IDs across fire mergers. Inspect heritage data separately if the research needs a physical incident spanning multiple IDs.
+## FEDS loader
 
-## Grid, priorities and changes
+`load_feds` returns a list of `Perimeter(timestamp, geometry)` and provenance data.
 
-`Grid` uses a fixed world origin `(0, 0)` and fixed cell size for the entire sequence. IDs are integer lattice coordinates, never array positions. Cells intersecting the polygon boundary become active; fully interior burned cells do not. Internal hole boundaries are included. Closed-cell intersection includes both adjacent cells for a boundary exactly on a grid line, including corner-only touches. This deliberate convention is covered by tests.
+- It keeps polygon parts and holes.
+- It joins duplicate records at one timestamp and records the number.
+- A missing ID, missing CRS, non-polygon geometry, missing time or invalid geometry causes an error. Use `--repair` to repair invalid geometry. The provenance records the number of repairs.
+- If a fire ID occurs in more than one year, you must give the year.
+- It uses one FEDS fire ID. It does not join IDs when fires merge.
+- It selects the projection from the first perimeter only.
 
-Each monitoring location is the cell centre, so the target is an approximation to the perimeter and may lie on either side of it. Maximum centre-to-boundary offset is half the cell diagonal. Exact sensor footprints, collision avoidance, no-fly zones and return-to-base constraints are outside this implementation.
+## Grid and point IDs
 
-Synthetic risk is a deterministic hash of `(seed, cell_id)`, taking values 1, 2 or 3. `q_i = base_revisit_s / risk_i`. It is independent of routing strategy and stable across snapshots. This is not inferred hazard, fire intensity or a validated risk model. Planners may use a different priority assignment if all variants receive the same assignment.
+- The grid has a fixed origin (0, 0) and a fixed cell size. A cell ID is `(grid_x, grid_y)`. It is not an array position.
+- The monitoring point is the cell centre. The maximum distance from the centre to the perimeter is half of the cell diagonal.
+- The model has no collision avoidance, no no-fly zones and no return to base.
 
-`perimeter_changes` computes:
+## Changes
 
-- `added`: current IDs absent previously.
-- `removed`: previous IDs absent currently.
-- `changed`: surviving IDs whose attributes or within-cell boundary geometry changed.
-- `affected_current = added | changed`: the current `C_t` for selective reset.
+`changes(previous, current)` gives:
 
-Geometry comparison is topological equality after clipping the boundary to each surviving cell. Very small geometric differences can flag a cell; there is no displacement tolerance. State that rule in experiment methods or add a pilot-selected tolerance before testing.
+- `added`: current IDs that were not in the previous set.
+- `removed`: previous IDs that are not in the current set.
+- `changed`: IDs in both sets with a different risk or revisit period.
+- `affected_current = added | changed`: C_t for selective reset.
 
-Reported magnitude is `|added ∪ removed ∪ changed| / |previous ∪ current|`. Initial activation reports fraction 1 and is **not** an adaptation event. For changes containing only deletions, `C_t` can be empty; deleted vertices and their incident edges still need to be removed.
+`fraction` is `|added ∪ removed ∪ changed| / |previous ∪ current|`. The first activation has fraction 1. It is not an adaptation event. If a change has only removed points, C_t is empty. You must still delete the edges of the removed points.
+
+The legacy commands use `perimeter_changes`. It also marks a cell as changed when the boundary in the cell changes.
 
 ## Planner contract
 
-`PlanningState` provides simulation time, planning horizon, speed, service duration, drone positions, monitoring points, and `last_seen` times. Points and history are copied when making a state. Treat the state as read-only. Distances are Euclidean metres and travel duration is distance/speed. Depot-to-point travel must use each drone's current position.
+`PlanningState` contains: time, horizon, speed, observation time, drone positions, points, `last_seen` and `coverage`. Do not change the state.
 
-Use `sorted(state.points)` to build deterministic dense matrix indices. Save that ID-to-index mapping for that stage only. On a change, remap pheromone by stable IDs; copying matrix rows by array index would transfer pheromone to unrelated points. New edges start at `tau_0`, deleted edges disappear, and surviving edges retain their values unless the chosen strategy resets them. Diagonal pheromone and repeated same-point visits need an explicit policy in the ACO implementation.
+- Distances are Euclidean, in metres. Travel time is distance divided by speed.
+- The first leg starts at the current position of the drone.
+- Use `sorted(state.points)` to make matrix indices. The indices are correct for one stage only.
+- When the points change, move pheromone by cell ID, not by matrix index. New edges start at `tau_0`. Delete the edges of removed points.
+- `coverage` gives, for each point, all points in the sensor radius (with the point). If `coverage` is `None`, a visit observes only the visited point.
 
-`coverage` (optional) maps each point to the points observed by visiting it: every point within the sensor radius, including itself. When it is `None`, a visit observes only the visited point. The returned `Evaluation.visits` lists `(time, drone_id, point_id)` for every completed observation.
+The planner returns one ordered list of IDs for each drone. A list can be empty.
 
-The planner returns exactly one ordered ID list per drone, including empty lists. Repeated IDs and shared visits are allowed. Every leg, including service at the destination, must finish within `H`. No mandatory return is imposed. A drone finishes at its last visited point and idles for the remaining time; it does not automatically observe while idling. Each explicit visit completes after a strictly positive service duration, including repeated same-point visits. This prevents infinite instantaneous visits. Plans extending beyond `H` are rejected atomically rather than silently truncated. Mid-flight replanning is therefore not modelled.
+- A route can visit a point more than one time. Drones can visit the same point.
+- All legs and observations must end in the horizon H. `evaluate` rejects a longer route. It does not cut the route.
+- A drone stops at its last point. It does not observe while it waits.
+- There is no replan during a flight.
 
-For strategy comparisons, clone the same starting environment/history and pre-change pheromone into each strategy, use paired seeds, and impose the same planning budget. The starter smoke CLI runs one deterministic plumbing router and does not implement this experiment harness or adaptation convergence traces.
+`evaluate(state, routes)` does not change the environment. Use it to compare candidates. Use `env.step(routes, H)` to fly the selected routes. `Evaluation.visits` lists `(time, drone_id, point_id)` for each observation.
+
+For strategy comparisons:
+
+- Start each strategy from the same environment, history and pheromone.
+- Use the same random seeds.
+- Use the same planning time.
 
 ## Revisit accounting
 
-Observations occur at service completion. Observations by different drones are merged and sorted per point; simultaneous events count once.
+An observation occurs when the drone completes its observation time. If two observations occur at the same time, they count as one.
 
-For a point active during `[t, t+H]`, build the times:
+For a point in stage [t, t+H], make this list of times:
 
 ```text
 [last observation (or activation), observations in this stage, t+H]
 ```
 
-`P_i` is the largest consecutive difference, and `J = max_i max(0, P_i/q_i - 1)`. This includes the terminal censored interval, so an unvisited point is not accidentally scored as zero. A gap may start before the stage: overdue history carries across replans. This is the implementation's explicit extension of the proposal's finite-horizon objective and should be stated in the report.
+`P_i` is the largest difference between two adjacent times. `J = max_i max(0, P_i / q_i - 1)`.
 
-New points have initial age zero at activation, without counting activation as a real observation. Surviving points preserve history. Removed points leave the objective and their history is discarded; a reappearing cell begins a new active lifetime. If the group chooses to preserve history across inactive periods, change this policy and its tests together.
+- The last interval (to t+H) is included. Thus an unvisited point has a gap.
+- A gap can start before the stage. The overdue time continues across replans. This is an extension of the proposal objective. State it in the report.
+- A new point starts at age 0. Activation is not an observation.
+- A removed point leaves the objective. If it comes back, it starts a new life.
+- With no points, J, the counts and the distances are 0.
+- `overdue_count` counts the points with `P_i > q_i` in the stage.
+- Route distance starts at the current position. It does not contain observation time or a return to base.
 
-An empty active set has objective, counts and distances zero. `overdue_count` counts points with `P_i > q_i` during the stage, not just points overdue at the final instant. Mean/max gap metrics aggregate the `P_i` values, not every inter-observation interval. Route cost includes travel from the current position, excludes service time, and has no implicit depot return.
+## Legacy commands
 
-## Time and experiment limitations
-
-The CLI holds the current source geometry until the next source timestamp, divided by `time_scale`. It never interpolates geometry or predicts spread. Source time labels and simulation seconds are both saved. Revisit periods and speed use simulation units and do not automatically rescale when `time_scale` changes.
-
-The last frame has no known successor and is held for the explicitly configured final horizon. A static run repeats the same source geometry/time label while simulation time advances. A controlled perturbation is a synthetic addition even when its starting geometry came from FEDS.
-
-Tests cover metric projection, actual GeoPackage round trips, chronological ordering, ambiguous fire IDs, geometry repair, grid identity, boundary selection, change detection, route feasibility, repeated/simultaneous observations, unvisited points, carryover, removal/reappearance, empty environments and deterministic smoke routes. Static ACO validation, exhaustive optimality checks, VNS validation and statistical experiment design belong to the algorithms/harness work that follows.
+`fire-sim demo` and `fire-sim feds` keep each FEDS perimeter constant until the next one. They divide time by `--time-scale` (default 72). Speed and revisit periods do not change with the time scale. Risk is a fixed hash of `(seed, cell_id)`. These commands do not use the fleet map.

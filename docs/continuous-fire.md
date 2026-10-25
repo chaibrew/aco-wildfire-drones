@@ -1,75 +1,120 @@
-# Continuous fire from 12-hourly FEDS snapshots
+# Continuous fire and fleet map
 
-FEDS perimeters come from VIIRS overpasses about 12 hours apart. Drones replan every few minutes, so the simulator needs the fire *between* observations. `fire_sim.spread` builds one with simple fire physics, constrained by both bracketing snapshots. The fire never runs past the last snapshot.
+FEDS gives one perimeter approximately each 12 hours. The drones replan each 10 minutes. Thus the simulation must have the fire between observations. This document describes:
 
-## Model
+1. The ground-truth fire (`spread.py`, `fire.py`, `weather.py`, `terrain.py`).
+2. The fleet map that the planner uses (`firemap.py`, `mission.py`).
+3. The validation of the ground-truth fire (`validation.py`).
 
-For each pair of snapshots A_k (time t_k) and A_{k+1} (time t_{k+1}), every cell of the 100 m raster that burns in between gets an arrival time:
+## 1. Ground-truth fire
+
+### Arrival time
+
+Snapshot A_k is at time t_k. Each cell that burns between A_k and A_{k+1} receives an arrival time:
 
 ```text
 T(x) = t_k + pace_k^{-1}( tau_f(x) / (tau_f(x) + tau_b(x)) )
 ```
 
-- `tau_f(x)`: least travel time from the edge of A_k to x.
-- `tau_b(x)`: least travel time from x to the edge of A_{k+1}.
+- `tau_f(x)`: the shortest travel time from the edge of A_k to x.
+- `tau_b(x)`: the shortest travel time from x to the edge of A_{k+1}.
 
-Both are shortest paths (Dijkstra, 16-neighbour stencil) through the newly burned band only, because fire cannot cross ground it already burned. The first and last half-cells are measured to the true polygon edges, so thin bands are not biased.
+The travel times come from Dijkstra on a 100 m raster with 16 neighbours. Fire travels only through the cells that burn in the interval. Fire cannot cross ground that burned before. The first and the last half cell use the distance to the true polygon edge.
 
-Edge cost is `length / rate`, with a relative directional rate built from three parts:
+### Spread rate
 
-| Factor | Formula | Source |
+The cost of a step is length divided by rate. The rate has three parts:
+
+| Part | Formula | Source |
 | --- | --- | --- |
-| Wind | Elliptical spread, rate `(1 - e) / (1 - e cos psi)` relative to the head. Length-to-breadth ratio from midflame wind (0.4 × 10 m wind), capped at 8. | Anderson (1983) |
-| Slope | `1 + 21 tan^2(slope)` uphill, 1 downhill. 21 = 5.275 β^-0.3 with β = 0.01. | Rothermel (1972) |
-| Heterogeneity | Seeded log-normal multiplier, σ = 0.3, 500 m Gaussian correlation | — |
+| Wind | Ellipse: `(1 - e) / (1 - e cos psi)` of the head rate. The length-to-breadth ratio comes from the midflame wind (0.4 × 10 m wind). Maximum ratio: 8. | Anderson (1983) |
+| Slope | `1 + 21 tan^2(slope)` uphill. 1 downhill. 21 = 5.275 β^-0.3, β = 0.01. | Rothermel (1972) |
+| Variation | Random log-normal factor, σ = 0.3, correlation length 500 m. The seed controls it. | — |
 
-`pace_k` maps the fraction of the interval's spread to clock time using cumulative `FFWI^p + 1`. FFWI is the Fosberg Fire Weather Index (Fosberg 1978), calculated hourly from Open-Meteo/ERA5 temperature, humidity and wind at the fire centroid. Wind for the ellipse is the FFWI-weighted vector mean over the interval, so shifting winds produce a rounder fire.
+### Pacing
 
-**Guarantees.** On the raster, {T ≤ t_k} equals the cumulative observed A_k for every snapshot. Growth is monotone. Absolute spread rates are never needed, because only ratios enter.
+`pace_k` changes the fraction of the spread into clock time. It uses the cumulative sum of `FFWI^p + 1`. FFWI is the Fosberg Fire Weather Index (Fosberg 1978). The simulation calculates FFWI each hour from the temperature, humidity and wind at the fire centre (Open-Meteo, ERA5). The default p is 2.
 
-**Other rules:**
-- Spot fires (pieces of A_{k+1} unreachable from A_k) ignite just after t_k at their cell nearest the old fire.
-- Unburned islands with no route out fill from their edge.
-- FEDS labels (`T00`/`T12`) are converted to approximate overpass times: 01:30 / 13:30 local solar time, ±1 h.
+The wind for the ellipse is the mean wind vector in the interval. FFWI gives the weight of each hour. When the wind direction changes, the mean vector decreases and the fire becomes more round.
 
-**What physics can and cannot change.** The snapshots already record how far the fire went in each direction. A speed-up that is uniform along a path cancels in the ratio. Physics reshapes timing where speed varies along a path (steep then flat terrain, heterogeneity), where the fastest way in and out differ (flanks under wind), and through the weather pacing.
+### Properties
 
-## Ground truth vs what the fleet knows
+- At each snapshot time t_k, the burned cells are equal to the FEDS perimeter A_k.
+- The burned area always increases.
+- The model uses only rate ratios. It does not use a fuel model.
 
-The ArrivalField is ground truth and is never shown to a planner. `run_mission` keeps the two apart.
+### Special cases
 
-**Fleet map (`FireMap`).** This is the planner's only input.
-- **At FEDS observations:** the planner learns the observed area (the true burned area at the snapshot time), after an optional latency.
-- **From drones:** an observation finishing at (x, y, t) reveals the true burned state within the sensor radius R (default: the cell size) at time t.
-- **Unobserved ground:** assumed unchanged since it was last seen. When the fire outruns a footprint, the map only knows "burned up to here", so drones chase the front. Undiscovered spot fires stay invisible until a drone passes or the next snapshot arrives.
-- **Monitoring points:** grid cells on the mapped perimeter (whole perimeter, not just the active part).
-- **Risk:** taken from the newest spread evidence for the cell.
-  - A snapshot gives the distance each newly burned cell lies beyond the previous snapshot, divided by the interval.
-  - A drone gives the distance newly seen fire lies beyond the previously known fire, divided by the time since that spot was last observed.
-  - Looking and seeing no advance records zero.
-  - Tiers: below 2 m/min → 1, 2–10 → 2, above 10 → 3. `q = base / risk`.
+- **Spot fire:** a part of A_{k+1} that the fire cannot reach from A_k. It starts immediately after t_k, at its cell nearest to A_k.
+- **Island:** an unburned area that has no path to unburned ground. It burns from its edge.
+- **Time labels:** FEDS labels are T00 and T12. The simulation changes them to the satellite times, 01:30 and 13:30 local solar time (accuracy ±1 h).
 
-**Footprints in planning.** `PlanningState.coverage` lists, for each point, every point within R of it. A visit observes them all, so `evaluate` credits nearby points too.
+### Limits of the physics
 
-**Truth score.** The true active front is found with `FrontMonitor`: perimeter cells where fire reaches a neighbour before the next observation.
-- A true cell counts as observed whenever it lies within R of any drone visit.
-- A satellite snapshot counts as observing everything at its observation time.
-- `true_objective` is J over these cells, so fire the fleet has not discovered goes overdue.
-- `front_on_map_fraction` is the share of true front cells that are on the map.
+The snapshots record how far the fire moved in each direction. If a speed increase is constant along a path, it has no effect on the ratio. Physics changes the timing only in these conditions:
 
-**Change pattern (Camp Fire, 24 h, 6 drones, smoke router, 1 km cells).**
-- Median 6% of points change per 10-minute replan, driven by drone discoveries.
-- 80% change when a snapshot lands.
-- `front_on_map_fraction` falls to about 0.8 before an observation, then resets to 1.
+- The speed changes along the path, for example steep ground and then flat ground.
+- The fastest path in and the fastest path out are in different directions, for example on a flank in wind.
+- The weather pacing changes the growth speed with time.
 
-## Validation: leave one snapshot out
+## 2. Ground truth and fleet map
 
-Hide snapshot k, interpolate the 24 h gap from k−1 to k+1, and compare with the hidden perimeter. Scores cover only cells that burned during the gap.
+The arrival-time fire is the ground truth. The planner never sees it. `run_mission` keeps the two separate.
 
-- **IoU**: growth-weighted overlap between predicted and observed growth (1 = perfect).
-- **Frac err**: absolute error in the share of the 24 h growth completed by t_k.
-- **Plain**: straight-line distance with uniform pacing (no physics), on the same raster.
-- **Physics** column: wind + terrain + FFWI² pacing, noise off.
+### Fleet map (`FireMap`)
+
+The fleet map is the only input to the planner.
+
+- **FEDS snapshot:** the map receives the true burned area at the snapshot time. An optional delay is available.
+- **Drone observation:** when an observation completes at (x, y, t), the map receives the true burned state in the sensor radius R at time t. The default R is the cell size.
+- **Unobserved ground:** the map keeps the last observed state. If the fire moves out of the sensor radius, the map shows the fire only to the edge of the radius. The drones must follow the front. The map does not show a spot fire until a drone or the next snapshot finds it.
+- **Monitoring points:** all grid cells on the mapped perimeter.
+
+### Risk
+
+Risk comes from the most recent spread evidence for the cell:
+
+- **Snapshot:** the distance of each new burned cell from the previous snapshot, divided by the interval.
+- **Drone:** the distance of the new burned area from the previously known fire, divided by the time since the last observation of that area.
+- **No advance:** when a drone sees no advance, the rate is 0.
+
+| Spread rate | Risk | Revisit period q |
+| --- | --- | --- |
+| Less than 2 m/min | 1 | 900 s |
+| 2 to 10 m/min | 2 | 450 s |
+| More than 10 m/min | 3 | 300 s |
+
+The first snapshot has no previous snapshot. Thus, if the mission starts at the first snapshot, all points have risk 1 until a drone measures the spread.
+
+### Sensor radius in planning
+
+`PlanningState.coverage` gives, for each point, all points in radius R. One visit observes all of them. `evaluate` records an observation for each of them.
+
+### Truth score
+
+`FrontMonitor` finds the true active front: the perimeter cells where the fire reaches a neighbour before the next observation.
+
+- A true cell is observed when it is in radius R of a drone visit.
+- A satellite snapshot observes all cells at its observation time.
+- `true_objective` is J on these cells. Fire that the fleet did not find becomes overdue.
+- `front_on_map_fraction` is the fraction of the true front cells that are on the fleet map.
+
+### Change pattern
+
+Camp Fire, 24 h, 6 drones, 1 km cells, `smoke_router`:
+
+- Each 10-minute replan changes a median of 6% of the points. Drone observations cause these changes.
+- A new snapshot changes 80% of the points.
+- `front_on_map_fraction` decreases to approximately 0.8 before a snapshot. After the snapshot, it is 1.
+
+## 3. Validation: leave one snapshot out
+
+Remove snapshot k. Interpolate the 24 h interval from k−1 to k+1. Compare the result at t_k with the removed perimeter. Only the cells that burned in the interval are compared.
+
+- **IoU:** overlap of the calculated growth and the observed growth (1 is perfect).
+- **Frac err:** error in the fraction of the 24 h growth that is complete at t_k.
+- **Physics:** wind, slope and FFWI² pacing. No random variation.
+- **Plain:** straight-line distance and constant pacing.
 
 | Fire (2018) | Area km² | Intervals | IoU physics | IoU plain | Frac err physics | Frac err plain |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -80,18 +125,19 @@ Hide snapshot k, interpolate the 24 h gap from k−1 to k+1, and compare with th
 | 3616 | 34 | 28 | 0.299 | 0.337 | 0.416 | 0.319 |
 | 67 | 19 | 7 | 0.095 | 0.132 | 0.482 | 0.482 |
 
-**Findings:**
-- Physics helps on the large, wind-driven fires and is slightly worse on small ones.
-- Most of the gain comes from weather pacing. Wind shape and slope each change IoU by about ±0.02.
-- A pacing exponent of p = 3 helped large fires more but hurt small ones. p = 2 is the default.
-- Absolute IoUs of 0.3–0.5 show that half-daily growth is lumpy and hard to recover by any method. The simulator only needs plausible in-between dynamics: the observed snapshots are always honoured.
+Results:
 
-Reproduce with `fire-sim fire ... --validate`, which writes `validation.csv`.
+- Physics is better on the large, wind-driven fires. It is slightly worse on the small fires.
+- Most of the improvement comes from the weather pacing. Wind shape and slope each change IoU by approximately 0.02.
+- p = 3 is better on large fires and worse on small fires. Thus the default is p = 2.
+- No method recovers the 12-hour growth accurately (IoU 0.3 to 0.5). The simulation needs only a possible fire between snapshots. It always agrees with the snapshots.
 
-## Limitations
+To repeat the check, use `fire-sim fire ... --validate`. The result is in `validation.csv`.
 
-- Single-point weather per fire, and no fuel map.
-- Suppression is not modelled.
-- Projected grid north is treated as true north.
-- Rates are relative within an interval, so the risk thresholds use interpolated rates, not observed ones.
-- Noise seeds give different in-between dynamics, but every seed shares the same observed snapshots.
+## Limits
+
+- Weather comes from one point for each fire. There is no fuel map.
+- The model has no fire suppression.
+- Grid north is used as true north.
+- The truth score uses interpolated spread rates. The fleet map uses observed spread rates.
+- Different seeds give different fires between snapshots. All seeds agree with the same snapshots.
