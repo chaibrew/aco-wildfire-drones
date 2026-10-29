@@ -6,8 +6,9 @@ data/raw/*
 data/processed/*
 outputs/*
 !data/raw/.gitkeep
+!data/raw/LargeFires_2018.gpkg
+!data/raw/LargeFires_2018.gpkg.provenance.json
 !data/processed/.gitkeep
 !outputs/.gitkeep
-data/cache/*
-!data/cache/.gitkeep
+data/cache/fields/
 prose-to-rewrite.md

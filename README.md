@@ -16,9 +16,11 @@ pytest -q
 
 ## Data
 
+The repository contains the FEDS 2018 GeoPackage (`data/raw/`) and the weather and elevation for the tested fires (`data/cache/weather/`, `data/cache/dem/`). For another year, download it:
+
 ```sh
-python scripts/fetch_feds.py --year 2018
-fire-sim inspect data/raw/LargeFires_2018.gpkg
+python scripts/fetch_feds.py --year 2019
+fire-sim inspect data/raw/LargeFires_2019.gpkg
 ```
 
 ## Ground-truth fire

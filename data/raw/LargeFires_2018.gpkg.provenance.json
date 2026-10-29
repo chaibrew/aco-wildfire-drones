@@ -1,0 +1,13 @@
+{
+  "metadata_url": "https://api.figshare.com/v2/articles/19170071/versions/1",
+  "download_url": "https://ndownloader.figshare.com/files/34062368",
+  "archive_md5": "fdb5f5130194b2d12e544d9672a1a43c",
+  "extracted_file": "LargeFires_2018.gpkg",
+  "extracted_sha256": "e0422afa10ac851e31ec31ac216a651c089f1d834ec52c004dfa985ea6eb73d3",
+  "license": {
+    "value": 2,
+    "name": "CC0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/"
+  },
+  "citation": "https://doi.org/10.1038/s41597-022-01343-0"
+}
