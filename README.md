@@ -88,6 +88,29 @@ A planner is a function. It receives a `PlanningState` and returns `{drone_id: [
 
 `smoke_router` only tests the pipeline. It is not a baseline.
 
+## ACO router
+
+`src/aco_router` is the ACO planner with the four pheromone strategies: retention, fast evaporation, selective reset and full reset. `FireSimRouter` connects it to `run_mission`. It scores each candidate plan with `evaluate` and moves pheromone by `CellId`.
+## ACO router
+`src/aco_router` is the ACO planner with the four pheromone strategies: retention, fast evaporation, selective reset and full reset. `FireSimRouter` connects it to `run_mission`. It scores each candidate plan with `evaluate` and moves pheromone by `CellId`.
+
+The experiment needs a FEDS Largefire GeoPackage ([Largefire archive](https://figshare.com/articles/dataset/Largefire_tar_gz/19170071/1), years 2012–2020) in `data/raw/`. `python scripts/fetch_feds.py --year 2018` downloads one. The defaults are `LargeFires_2018.gpkg` and fire 3885 (the Camp Fire). To use a different file or fire, add `--gpkg`, `--year` and `--fire-id`. The first run for a new fire downloads its weather and elevation into `data/cache/`.
+
+- `aco_experiment.py` flies `smoke_router` and the four ACO strategies over the Camp Fire (fire 3885, first 24 h, 144 replans of 10 minutes) for 10 seeds. Each seed changes the fire between snapshots and the random choices of the ACO. The script writes one row for each run, with map J, true-front J and overdue counts. It takes approximately 30 to 60 minutes.
+- `--help` shows the config options (fire, snapshots, hours, seeds, drones, ACO budget).
+- `aco_analyse.py` reads that CSV and compares each strategy with `smoke_router` on the same seed. For each metric it gives the mean difference, a paired t statistic and the number of seeds that each strategy won.
+
+For example, the commands below run the tests, then runs `smoke_router` and the four ACO strategies with 6 drones over 10 seeds, and writes the results to a file at `outputs/camp3885-6-drones.csv`. The last command compares each strategy with `smoke_router` on the same seed. For each metric it gives the mean difference, a paired t statistic (with 10 seeds, |t| > 2.26 means p < 0.05) and the number of seeds where the strategy was better.
+
+
+```sh
+python -m pytest -q
+python scripts/aco_experiment.py --drones 6 --out outputs/camp3885-6-drones.csv
+python scripts/aco_analyse.py outputs/camp3885-6-drones.csv
+```
+
+The ACO parameters are in `src/aco_router/config.py`.
+
 ## Model details
 
 Refer to [docs/continuous-fire.md](docs/continuous-fire.md).
