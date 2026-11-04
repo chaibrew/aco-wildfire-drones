@@ -124,3 +124,10 @@ Refer to [docs/continuous-fire.md](docs/continuous-fire.md).
 - [Copernicus GLO-30 DEM](https://registry.opendata.aws/copernicus-dem/)
 
 The loader uses the `perimeter` layer of the published 2012–2020 schema. Other FEDS releases can have different field names.
+
+
+## Baselines and controlled-change experiments
+
+Greedy and VNS planners (`src/baselines`) and the paired controlled-change experiment (`src/experiment`,
+`scripts/run_change_experiment.py`, `scripts/analyse_change_experiment.py`) are described in
+[docs/experiment-harness.md](docs/experiment-harness.md).
