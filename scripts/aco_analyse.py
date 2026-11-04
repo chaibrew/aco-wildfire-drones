@@ -15,15 +15,17 @@ rows = list(csv.DictReader(open(sys.argv[1])))
 by: dict[str, dict[int, dict]] = {}
 for r in rows:
     by.setdefault(r["planner"], {})[int(r["seed"])] = r
-base = by["smoke_router"]
+baseline = sys.argv[2] if len(sys.argv) > 2 else "greedy"  # e.g. smoke_router, vns, aco_full_reset
+base = by[baseline]
+diff_label = f"diff vs {baseline}"
 seeds = sorted(base)
 print(f"{len(seeds)} seeds\n")
 for key, label in METRICS:
     print(label)
-    print(f"  {'planner':22s} {'mean':>9s} {'diff vs smoke':>14s} {'t':>7s} {'lower on':>9s}")
+    print(f"  {'planner':22s} {'mean':>9s} {diff_label:>14s} {'t':>7s} {'lower on':>9s}")
     for name, d in by.items():
         vals = [float(d[s][key]) for s in seeds]
-        if name == "smoke_router":
+        if name == baseline:
             print(f"  {name:22s} {statistics.mean(vals):9.3f}")
             continue
         diffs = [float(d[s][key]) - float(base[s][key]) for s in seeds]
