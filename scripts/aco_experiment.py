@@ -22,8 +22,11 @@ def parse_args():
     parser.add_argument("--hours", type=float, default=24.0, help="mission length")
     parser.add_argument("--drones", type=int, default=6)
     parser.add_argument("--cell-size", type=float, default=1000.0)
-    parser.add_argument("--ants", type=int, default=10)
-    parser.add_argument("--iterations", type=int, default=15)
+    parser.add_argument("--ants", type=int, default=20)
+    parser.add_argument("--iterations", type=int, default=60)
+    parser.add_argument("--params", default=None,
+                        help="JSON of ACO parameters (e.g. outputs/tuning/defaults_params.json); "
+                             "--ants and --iterations still set the budget")
     parser.add_argument("--out", required=True, help="results csv")
     return parser.parse_args()
 
@@ -45,7 +48,11 @@ def make_planners(params):
 def main():
     args = parse_args()
     config = MissionConfig(cell_size_m=args.cell_size, drones=args.drones, horizon_s=600)
-    planners = make_planners(ACOParams(n_ants=args.ants, max_iterations=args.iterations))
+    base = ACOParams()
+    if args.params:
+        from tuning.space import load_params
+        base = load_params(args.params)
+    planners = make_planners(base.with_(n_ants=args.ants, max_iterations=args.iterations))
 
     results = []
     for seed in range(args.seeds):
