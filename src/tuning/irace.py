@@ -1,27 +1,3 @@
-"""A small iterated race in the style of irace (Lopez-Ibanez et al., 2016), in Python.
-
-Plain F-Race races one fixed sample of candidates. irace repeats the race: after each race the
-best survivors ("elites") are kept, new candidates are sampled near them, and the sampling
-spread shrinks from one iteration to the next, so later races search a smaller region around
-the settings that did well.
-
-What follows irace's defaults:
-  * number of iterations N_iter = 2 + floor(log2(d)) for d parameters;
-  * the remaining budget is split evenly over the remaining iterations, and iteration j races
-    floor(B_j / (mu + min(5, j))) candidates (mu = first_test = 5);
-  * up to N_min = 2 + floor(log2(d)) elites are kept (best mean rank among the survivors);
-  * a new candidate picks an elite as its parent with probability proportional to
-    (N_elites - rank + 1), and each parameter is drawn from a normal distribution centred on the
-    parent's value (on the unit scale, truncated to [0, 1]); the standard deviation starts at 0.5
-    and is multiplied by (1 / N_new)^(1 / d) every iteration.
-
-Simplifications (stated so the report can say what was run):
-  * every race uses the same fixed list of instances, in the same order, and results already
-    computed for a (candidate, instance) pair are reused instead of rerun;
-  * elites can be dropped by a race like any other candidate (irace's "elitist" rule, which
-    protects elites until new instances have been seen, is not implemented);
-  * only numerical parameters are sampled.
-"""
 from __future__ import annotations
 
 import math
@@ -34,19 +10,18 @@ from scipy.stats import qmc
 
 from .frace import BlockScores, race
 
-# evaluate(list of parameter-value dicts, instance index) -> one raw result per dict
 ConfigEvaluate = Callable[[Sequence[dict], int], Sequence[object]]
 
 
 @dataclass
 class IraceResult:
-    best: int  # id of the best final elite
+    best: int
     elites: list[int]
-    configs: list[dict]  # id -> parameter values (unit-cube point under "_unit")
-    parent: list[int | None]  # id -> parent id (None for the first iteration and initial settings)
-    born: list[int]  # id -> iteration in which it was sampled
-    iterations: list[dict] = field(default_factory=list)  # one summary row per iteration
-    experiments: int = 0  # (candidate, instance) evaluations actually run
+    configs: list[dict]
+    parent: list[int | None]
+    born: list[int]
+    iterations: list[dict] = field(default_factory=list)
+    experiments: int = 0
     cache: dict[tuple[int, int], object] = field(default_factory=dict)
 
 
@@ -85,7 +60,7 @@ def iterated_race(space: Sequence[tuple[str, float, float, bool]],
             for v in initial:
                 new.append(add(dict(v), None, it))
             if n_new > len(new):
-                with warnings.catch_warnings():  # balance warning for n not a power of 2: harmless here
+                with warnings.catch_warnings():
                     warnings.simplefilter("ignore", UserWarning)
                     sample = qmc.Sobol(d=d, scramble=True, seed=seed).random(n_new - len(new))
                 new += [add(to_values(u), None, it) for u in sample]

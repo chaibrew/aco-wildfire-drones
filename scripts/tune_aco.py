@@ -1,18 +1,3 @@
-"""ACO parameter tuning: budget check, F-Race over the shared parameters, an iterated race (irace-style)
-over the same space, and F-Race over fast evaporation's own parameters.
-
-Every step uses its own instance seeds and Camp Fire states (tuning.instances.SEEDS), none of which
-overlap the reported experiments (seeds from 0; Camp Fire fire seed 0, stages 6/40/80).
-
-Examples
-  python scripts/tune_aco.py budget --camp --instances 20 --workers 8 --out outputs/tuning/budget
-  python scripts/tune_aco.py shared --camp --ants 20 --iterations 60 --instances 30 --workers 8 \
-      --out outputs/tuning/shared
-  python scripts/tune_aco.py irace --camp --ants 20 --iterations 60 --instances 30 --budget 1000 \
-      --workers 8 --out outputs/tuning/irace
-  python scripts/tune_aco.py fast-evaporation --params outputs/tuning/chosen_shared.json --camp \
-      --ants 20 --iterations 60 --instances 30 --workers 8 --out outputs/tuning/fast_evaporation
-"""
 from __future__ import annotations
 
 import argparse
@@ -33,7 +18,7 @@ DEFAULT_BUDGETS = ("5x10", "10x15", "10x30", "20x30", "20x60", "40x60")
 
 
 def parse_args():
-    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = argparse.ArgumentParser()
     sub = p.add_subparsers(dest="step", required=True)
     for name in ("budget", "shared", "irace", "fast-evaporation"):
         s = sub.add_parser(name)
@@ -164,7 +149,6 @@ def run_irace(a):
         res = iterated_race(SHARED_SPACE, from_unit, to_unit, evaluate, len(instances), budget=a.budget,
                             initial=[defaults], seed=a.seed, first_test=a.first_test, alpha=a.alpha,
                             block_scores=block_scores, progress=log)
-    # result rows were labelled in evaluation order; relabel them with irace's own candidate ids
     by_key = {tuple(c[n] for n in SHARED_NAMES): i for i, c in enumerate(res.configs)}
     inv = {v: by_key[k] for k, v in ids_seen.items()}
     for r in rows:

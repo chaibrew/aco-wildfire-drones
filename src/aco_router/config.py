@@ -44,27 +44,26 @@ HORIZON_TOLERANCE_S: float = 1e-9
 
 @dataclass(frozen=True)
 class ACOParams:
-    # Defaults are the tuned setting (F-Race, docs/tuning.md; outputs/tuning/tuned_params.json).
-    # The values before tuning are kept in tuning.space.UNTUNED_PARAMS.
-    n_ants: int = 20  # budget check: 20 ants x 60 iterations (was 10 x 15 in the experiments)
-    alpha: float = 0.73  # was 1.0
-    beta: float = 2.49  # was 1.0
-    rho: float = 0.36  # was 0.1
+    # Tuned defaults (docs/tuning.md); pre-tuning values are in tuning.space.UNTUNED_PARAMS.
+    n_ants: int = 20
+    alpha: float = 0.73
+    beta: float = 2.49
+    rho: float = 0.36
     deposit_q: float = 1.0
     tau0_mode: Tau0Mode = Tau0Mode.NEAREST_NEIGHBOUR
     tau0_constant: float = 1.0
 
-    rho_high: float = 0.5  # fast-evaporation race: no evidence to change
-    fast_evaporation_iterations: int = 10  # fast-evaporation race: no evidence to change
+    rho_high: float = 0.5
+    fast_evaporation_iterations: int = 10
 
-    urgency_weight: float = 1.93  # was 2.0
-    urgency_floor: float = 0.12  # was 0.05
+    urgency_weight: float = 1.93
+    urgency_floor: float = 0.12
 
     use_bounds: bool = True
-    tau_min_ratio: float = 0.024  # was 0.01
+    tau_min_ratio: float = 0.024
 
     budget_kind: BudgetKind = BudgetKind.ITERATIONS
-    max_iterations: int = 60  # was 100 (the experiment scripts used 15)
+    max_iterations: int = 60
     time_budget_s: float = 10.0
 
     def __post_init__(self) -> None:

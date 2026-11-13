@@ -1,14 +1,3 @@
-"""Confirmation: compare parameter settings on fresh instances (seeds 2100-2119; Camp Fire fire seed 2100,
-stages 30/70/110), none of which were used to choose parameters.
-
-Each setting is NAME=SPEC, where SPEC is "defaults" (the untuned parameters, tuning.UNTUNED_PARAMS) or a parameter JSON. All settings
-run at the same budget (--ants x --iterations), so only the other parameters differ. The first setting is
-the reference: every other setting is compared with it, case by case (instance x strategy).
-
-Example
-  python scripts/confirm_tuning.py defaults=defaults c11=outputs/tuning/shared_candidate11.json \
-      --camp --workers 8 --out outputs/tuning/confirm.csv
-"""
 from __future__ import annotations
 
 import argparse
@@ -22,7 +11,7 @@ from tuning.run import ParallelEvaluator, confirmation_summary, result_rows, set
 
 
 def parse_args():
-    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = argparse.ArgumentParser()
     p.add_argument("settings", nargs="+", help="NAME=defaults or NAME=path/to/params.json; first = reference")
     p.add_argument("--out", required=True, help="raw results csv; _summary.csv and _means.csv are written beside it")
     p.add_argument("--camp", action="store_true")

@@ -1,4 +1,3 @@
-"""Running the tuning steps: parallel evaluation, budget check, races, confirmation, CSV output."""
 from __future__ import annotations
 
 import csv
@@ -25,7 +24,6 @@ def _job(args):
 
 
 class ParallelEvaluator:
-    """evaluate(list of ACOParams, instance index) -> list of strategy_costs results, run in parallel."""
 
     def __init__(self, instances: Sequence[TuningInstance], workers: int = 1,
                  strategies: Sequence[StrategyName] = STRATEGIES, warmup: int = 5):
@@ -41,7 +39,6 @@ class ParallelEvaluator:
         return list(self.pool.map(_job, jobs))
 
     def across_instances(self, params: ACOParams, instances: Sequence[int] | None = None) -> list[dict]:
-        """One setting on many instances (in parallel); results in instance order."""
         idx = range(len(self.instances)) if instances is None else instances
         jobs = [(params, self.instances[i], self.strategies, self.warmup) for i in idx]
         if self.pool is None:
@@ -58,8 +55,6 @@ class ParallelEvaluator:
     def __exit__(self, *exc):
         self.close()
 
-
-# ---------------------------------------------------------------- rows and CSV
 
 def result_rows(instances: Sequence[TuningInstance], inst: int, setting: str | int, result: dict,
                 **extra) -> list[dict]:
@@ -84,11 +79,7 @@ def read_csv(path: str) -> list[dict]:
         return list(csv.DictReader(fh))
 
 
-# ---------------------------------------------------------------- paired comparisons
-
 def compare(a: Sequence[float], b: Sequence[float]) -> dict:
-    """Paired comparison of b against a (lower is better): counts of b better / tied / worse, mean change,
-    and a two-sided Wilcoxon signed-rank p-value (zsplit for ties; 1.0 when every pair is tied)."""
     a, b = np.asarray(a, float), np.asarray(b, float)
     diff = b - a
     better, worse = int((diff < -TIE).sum()), int((diff > TIE).sum())
@@ -100,7 +91,6 @@ def compare(a: Sequence[float], b: Sequence[float]) -> dict:
 
 def paired(rows: Sequence[dict], ref: str, other: str, key: Callable[[dict], float],
            strategy: str | None = None) -> dict:
-    """Pairs rows of setting `ref` and `other` by (instance, strategy)."""
     def index(name):
         return {(r["instance"], r["strategy"]): key(r) for r in rows
                 if str(r["setting"]) == name and (strategy is None or r["strategy"] == strategy)}
@@ -136,7 +126,6 @@ def budget_summary(rows: Sequence[dict], budgets: Sequence[tuple[int, int]]) -> 
 
 
 def confirmation_summary(rows: Sequence[dict], ref: str, others: Sequence[str]) -> list[dict]:
-    """One row per (other setting, strategy or 'all', measure) comparing it with `ref`."""
     strategies = [None] + sorted({r["strategy"] for r in rows})
     out = []
     for other in others:
@@ -158,8 +147,6 @@ def setting_means(rows: Sequence[dict]) -> list[dict]:
                     **{m: float(np.mean([_f(r, m) for r in mine])) for m in MEASURES}})
     return out
 
-
-# ---------------------------------------------------------------- race output
 
 def race_candidate_rows(race_result: RaceResult, candidates: Sequence[ACOParams], names: Sequence[str],
                         labels: dict[int, str] | None = None) -> list[dict]:

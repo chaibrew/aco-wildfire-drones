@@ -1,4 +1,3 @@
-"""Candidate settings: the shared parameter space, the fast-evaporation grid, and JSON I/O."""
 from __future__ import annotations
 
 import json
@@ -11,7 +10,6 @@ from scipy.stats import qmc
 
 from aco_router import ACOParams, BudgetKind, Tau0Mode
 
-# (field, low, high, log scale)
 SHARED_SPACE: tuple[tuple[str, float, float, bool], ...] = (
     ("alpha", 0.5, 2.0, False),
     ("beta", 0.5, 3.0, False),
@@ -25,17 +23,14 @@ SHARED_NAMES = tuple(name for name, *_ in SHARED_SPACE)
 RHO_HIGH_GRID = (0.2, 0.3, 0.5, 0.7, 0.9)
 K_GRID = (2, 5, 10, 20)
 
-# The parameters as they were before tuning (the old ACOParams defaults). Kept fixed here, so that
-# "defaults" still means the untuned setting after config.py is updated with the tuned values.
+# Fixed copy of the pre-tuning values: "defaults" must still mean untuned after config.py changed.
 UNTUNED_PARAMS = ACOParams(n_ants=10, max_iterations=15, alpha=1.0, beta=1.0, rho=0.1, urgency_weight=2.0,
                            urgency_floor=0.05, tau_min_ratio=0.01, rho_high=0.5, fast_evaporation_iterations=10)
 
-# parameter values are rounded so the JSON and the report show the same numbers
 DECIMALS = 4
 
 
 def from_unit(u: np.ndarray, space=SHARED_SPACE) -> dict[str, float]:
-    """Map a point of the unit cube to parameter values (log scale where marked)."""
     out = {}
     for x, (name, lo, hi, log) in zip(u, space):
         v = math.exp(math.log(lo) + x * (math.log(hi) - math.log(lo))) if log else lo + x * (hi - lo)
@@ -53,17 +48,11 @@ def to_unit(values: dict[str, float], space=SHARED_SPACE) -> np.ndarray:
 
 
 def sobol_candidates(base: ACOParams, n: int = 32, seed: int = 0) -> list[ACOParams]:
-    """Candidate 0 is `base` (the current defaults); then n scrambled-Sobol settings over SHARED_SPACE."""
     sample = qmc.Sobol(d=len(SHARED_SPACE), scramble=True, seed=seed).random(n)
     return [base] + [base.with_(**from_unit(u)) for u in sample]
 
 
 def fast_evaporation_grid(base: ACOParams, rho_highs=RHO_HIGH_GRID, ks=K_GRID) -> list[ACOParams]:
-    """Candidate 0 is `base`'s own (rho_high, k); the rest of the grid follows, skipping rho_high <= rho.
-
-    A rho_high at or below rho would make the strategy evaporate no faster (or slower) after a change,
-    so it would not be "fast evaporation".
-    """
     current = (base.rho_high, base.fast_evaporation_iterations)
     out = [base]
     for rh in rho_highs:
@@ -100,7 +89,6 @@ def save_params(path: str, params: ACOParams, **meta) -> None:
 
 
 def load_params(path: str, base: ACOParams | None = None) -> ACOParams:
-    """Accepts either {"params": {...}, ...} (as written by save_params) or a flat dict of fields."""
     with open(path) as fh:
         d = json.load(fh)
     return params_from_dict(d.get("params", d), base)

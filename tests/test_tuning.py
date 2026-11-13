@@ -74,7 +74,7 @@ def test_fast_evaporation_grid_starts_with_current_and_skips_low_rho_high():
     assert grid[0] == base
     assert all(c.rho_high > base.rho for c in grid)
     pairs = [(c.rho_high, c.fast_evaporation_iterations) for c in grid]
-    assert len(pairs) == len(set(pairs)) == 3 * 4  # 0.5, 0.7, 0.9 x 4 values of k
+    assert len(pairs) == len(set(pairs)) == 3 * 4
 
 
 def test_instances_use_tuning_seeds_and_are_reproducible():
@@ -124,7 +124,7 @@ def test_zero_change_gives_identical_scores(instance):
 def test_rank_key_orders_by_margin_then_total_overdue():
     a = {"margin": 2.0, "total_overdue": 100.0}
     b = {"margin": 2.1, "total_overdue": 0.0}
-    c = {"margin": 2.0 + 1e-9, "total_overdue": 50.0}  # margin equal up to float noise
+    c = {"margin": 2.0 + 1e-9, "total_overdue": 50.0}
     assert rank_key(a) < rank_key(b)
     assert rank_key(c) < rank_key(a)
 

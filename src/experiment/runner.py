@@ -55,7 +55,7 @@ class ExperimentConfig:
     trials: int = 10
     first_seed: int = 0
     warmup: int = 5  # replans on the base state before the change
-    ants: int = 20  # tuned budget (docs/tuning.md)
+    ants: int = 20
     iterations: int = 60
     vns_evaluations: int | None = None  # None: ants * iterations (equal budget)
     n_points: int = 60  # synthetic only
@@ -63,7 +63,7 @@ class ExperimentConfig:
     cell_size_m: float = 1000.0
     sensor_radius_m: float | None = None
     workers: int = 1
-    params: ACOParams | None = None  # other ACO parameters; None = ACOParams defaults
+    params: ACOParams | None = None
 
     def aco_params(self) -> ACOParams:
         return (self.params or ACOParams()).with_(n_ants=self.ants, max_iterations=self.iterations)

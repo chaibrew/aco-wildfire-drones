@@ -1,12 +1,3 @@
-"""F-Race (Birattari et al., 2002) with the statistics used by irace (Lopez-Ibanez et al., 2016).
-
-Candidates are evaluated one instance (block) at a time. From `first_test` instances on, a
-Friedman test on the within-block ranks checks whether the candidates differ; if they do
-(p < alpha), a Conover post-hoc test drops every candidate whose rank sum is worse than the
-best by more than the critical difference. With two candidates left, a Wilcoxon signed-rank
-test is used instead. Every earlier block is rescored on the surviving candidates after each
-elimination, so dropped candidates no longer affect the ranks.
-"""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -15,18 +6,16 @@ from typing import Callable, Sequence
 import numpy as np
 from scipy import stats
 
-# evaluate(alive candidate ids, instance index) -> one raw result per alive candidate
 BatchEvaluate = Callable[[Sequence[int], int], Sequence[object]]
-# block_scores(raw results of the alive candidates on one block) -> one cost per candidate (lower is better)
 BlockScores = Callable[[Sequence[object]], Sequence[float]]
 
 
 @dataclass
 class RaceStep:
-    instance: int  # 1-based number of instances raced so far
+    instance: int
     alive_before: int
     alive_after: int
-    test: str  # "none", "friedman" or "wilcoxon"
+    test: str
     p_value: float
     eliminated: tuple[int, ...]
 
@@ -35,11 +24,11 @@ class RaceStep:
 class RaceResult:
     best: int
     alive: list[int]
-    costs: np.ndarray  # instances x candidates, nan where a candidate had been dropped
+    costs: np.ndarray
     instances_used: int
-    eliminated_at: dict[int, int] = field(default_factory=dict)  # candidate -> instances raced when dropped
+    eliminated_at: dict[int, int] = field(default_factory=dict)
     steps: list[RaceStep] = field(default_factory=list)
-    raw: list[dict[int, object]] = field(default_factory=list)  # per instance: candidate -> raw result
+    raw: list[dict[int, object]] = field(default_factory=list)
 
     def mean_rank(self, candidates: Sequence[int] | None = None) -> dict[int, float]:
         cand = list(self.alive if candidates is None else candidates)
@@ -49,7 +38,6 @@ class RaceResult:
 
 
 def friedman_survivors(block: np.ndarray, alpha: float) -> tuple[list[int], float, str]:
-    """block: instances x alive candidates. Returns (positions of survivors, p-value, test name)."""
     n, k = block.shape
     if k == 2:
         diff = block[:, 0] - block[:, 1]
@@ -63,7 +51,7 @@ def friedman_survivors(block: np.ndarray, alpha: float) -> tuple[list[int], floa
     rank_sums = ranks.sum(axis=0)
     a = float((ranks**2).sum())
     c = n * k * (k + 1) ** 2 / 4.0
-    if a - c <= 0:  # every block is a complete tie
+    if a - c <= 0:
         return list(range(k)), 1.0, "friedman"
     t = (k - 1) * float(((rank_sums - n * (k + 1) / 2.0) ** 2).sum()) / (a - c)
     p = float(1.0 - stats.chi2.cdf(t, k - 1))
@@ -79,11 +67,6 @@ def race(n_candidates: int, n_instances: int, evaluate: BatchEvaluate, *, first_
          alpha: float = 0.05, block_scores: BlockScores | None = None,
          progress: Callable[[str], None] | None = None,
          stop: Callable[[Sequence[int], int], bool] | None = None) -> RaceResult:
-    """Race `n_candidates` over up to `n_instances` instances.
-
-    stop(alive, instance index): optional budget check made before each instance after the first
-    `first_test`; returning True ends the race early (used by the iterated race).
-    """
     if n_candidates < 1 or n_instances < 1:
         raise ValueError("need at least one candidate and one instance")
     score = block_scores or (lambda results: [float(r) for r in results])
@@ -109,7 +92,7 @@ def race(n_candidates: int, n_instances: int, evaluate: BatchEvaluate, *, first_
             for cand in dropped:
                 eliminated[cand] = used
             alive = [alive[j] for j in keep]
-            if dropped:  # rescore every block on the survivors only
+            if dropped:  # re-rank earlier blocks without the dropped candidates
                 block = np.array([score([results[i][c] for c in alive]) for i in range(used)], dtype=float)
                 costs[:used] = np.nan
                 costs[:used][:, alive] = block

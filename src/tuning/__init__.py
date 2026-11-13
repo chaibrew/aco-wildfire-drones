@@ -1,4 +1,3 @@
-"""Parameter tuning for the ACO router: F-Race, a small iterated race, and the tuning instances."""
 from .frace import RaceResult, RaceStep, friedman_survivors, race
 from .instances import (SEEDS, STRATEGIES, SeedPlan, TuningInstance, block_scores, camp_states, make_instances,
                         plan_scores, rank_key, strategy_costs)
