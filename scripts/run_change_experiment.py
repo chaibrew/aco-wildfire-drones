@@ -33,8 +33,8 @@ def parse_args():
     p.add_argument("--trials", type=int, default=10)
     p.add_argument("--first-seed", type=int, default=0)
     p.add_argument("--warmup", type=int, default=5, help="replans on the base state before the change")
-    p.add_argument("--ants", type=int, default=10)
-    p.add_argument("--iterations", type=int, default=15)
+    p.add_argument("--ants", type=int, default=20)
+    p.add_argument("--iterations", type=int, default=60)
     p.add_argument("--vns-evals", type=int, default=None, help="default: ants * iterations (equal budget)")
     p.add_argument("--points", type=int, default=60, help="synthetic: number of monitoring points")
     p.add_argument("--drones", type=int, default=6)
@@ -48,8 +48,18 @@ def parse_args():
     p.add_argument("--cache", default="data/cache")
     p.add_argument("--stages", type=int, nargs="+", default=[6, 40, 80],
                    help="feds: mission stages whose planning state is used as the base scenario")
+    p.add_argument("--params", default=None,
+                   help="JSON of ACO parameters (e.g. outputs/tuning/defaults_params.json); "
+                        "--ants and --iterations still set the budget")
     p.add_argument("--out", required=True)
     return p.parse_args()
+
+
+def _load_params(path):
+    if not path:
+        return None
+    from tuning.space import load_params
+    return load_params(path)
 
 
 def main():
@@ -57,7 +67,8 @@ def main():
     cfg = ExperimentConfig(phase=a.phase, scenario=a.source, fractions=tuple(a.fractions),
                            localities=tuple(a.localities), kind=a.kind, trials=a.trials, first_seed=a.first_seed,
                            warmup=a.warmup, ants=a.ants, iterations=a.iterations, vns_evaluations=a.vns_evals,
-                           n_points=a.points, drones=a.drones, cell_size_m=a.cell_size, workers=a.workers)
+                           n_points=a.points, drones=a.drones, cell_size_m=a.cell_size, workers=a.workers,
+                           params=_load_params(a.params))
     print(f"budget per replan: ACO {cfg.ants * cfg.iterations} evaluations, VNS {cfg.vns_params().max_evaluations}")
     if a.source == "synthetic":
         rows, traces = run_synthetic(cfg)

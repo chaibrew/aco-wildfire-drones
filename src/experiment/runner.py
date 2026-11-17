@@ -55,17 +55,18 @@ class ExperimentConfig:
     trials: int = 10
     first_seed: int = 0
     warmup: int = 5  # replans on the base state before the change
-    ants: int = 10
-    iterations: int = 15
+    ants: int = 20
+    iterations: int = 60
     vns_evaluations: int | None = None  # None: ants * iterations (equal budget)
     n_points: int = 60  # synthetic only
     drones: int = 6
     cell_size_m: float = 1000.0
     sensor_radius_m: float | None = None
     workers: int = 1
+    params: ACOParams | None = None
 
     def aco_params(self) -> ACOParams:
-        return ACOParams(n_ants=self.ants, max_iterations=self.iterations)
+        return (self.params or ACOParams()).with_(n_ants=self.ants, max_iterations=self.iterations)
 
     def vns_params(self) -> VNSParams:
         return VNSParams(max_evaluations=self.vns_evaluations or self.ants * self.iterations)
