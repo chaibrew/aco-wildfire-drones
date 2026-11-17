@@ -8,6 +8,7 @@ from fire_sim.mission import MissionConfig, run_mission
 from fire_sim.simulation import smoke_router
 
 from aco_router import ACOParams, ACORouter, FireSimRouter, StrategyName, summary
+from baselines import GreedyRouter, VNSParams, VNSRouter
 
 
 def parse_args():
@@ -28,7 +29,12 @@ def parse_args():
 
 
 def make_planners(params):
-    planners = [("smoke_router", lambda seed: smoke_router)]
+    planners = [
+        ("smoke_router", lambda seed: smoke_router),
+        ("greedy", lambda seed: GreedyRouter()),
+        # VNS gets the same number of plan evaluations as ACO (ants * iterations) per replan
+        ("vns", lambda seed: VNSRouter(VNSParams(max_evaluations=params.n_ants * params.max_iterations), seed=seed)),
+    ]
     for strategy in StrategyName:
         def make(seed, strategy=strategy):
             return FireSimRouter(ACORouter(params, strategy=strategy, seed=seed))
