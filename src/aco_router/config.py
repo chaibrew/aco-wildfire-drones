@@ -36,6 +36,7 @@ COUNT_Q_CHANGE_AS_MODIFIED: bool = True
 POSITION_TOLERANCE_M: float = 1.0
 Q_RELATIVE_TOLERANCE: float = 1e-6
 LOCAL_CHANGE_MAX_FRACTION: float = 0.5
+CHANGE_TRIGGERS: tuple[str, ...] = ("any", "widespread")
 
 DISTANCE_EPS_M: float = 1e-6
 COST_EPS: float = 1e-9
@@ -66,9 +67,16 @@ class ACOParams:
     max_iterations: int = 60
     time_budget_s: float = 10.0
 
+    selective_radius_m: float = 0.0
+    change_trigger: str = "any"
+
     def __post_init__(self) -> None:
         if self.n_ants < 1:
             raise ValueError("n_ants must be >= 1")
+        if self.selective_radius_m < 0:
+            raise ValueError("selective_radius_m must be >= 0")
+        if self.change_trigger not in CHANGE_TRIGGERS:
+            raise ValueError(f"change_trigger must be one of {CHANGE_TRIGGERS}")
         for name in ("rho", "rho_high"):
             value = getattr(self, name)
             if not 0.0 <= value < 1.0:

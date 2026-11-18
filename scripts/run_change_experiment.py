@@ -19,7 +19,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from experiment import ExperimentConfig, captured_states, run_from_states, run_synthetic, write_csv  # noqa: E402
-from experiment.runner import RESULT_FIELDS, TRACE_FIELDS  # noqa: E402
+from experiment.runner import PLANNERS, RESULT_FIELDS, TRACE_FIELDS  # noqa: E402
 
 
 def parse_args():
@@ -30,6 +30,11 @@ def parse_args():
     p.add_argument("--localities", nargs="+", default=["concentrated", "distributed"],
                    choices=["concentrated", "distributed"])
     p.add_argument("--kind", choices=("risk", "advance", "mixed"), default="mixed")
+    p.add_argument("--direction", choices=("cycle", "up"), default="cycle",
+                   help="risk changes: cycle 1->2->3->1 (original) or up one tier (risk 3 advances instead)")
+    p.add_argument("--selective-radius", type=float, default=None,
+                   help="selective reset also resets points within this many metres of a change (default: params)")
+    p.add_argument("--planners", nargs="+", default=list(PLANNERS), choices=list(PLANNERS))
     p.add_argument("--trials", type=int, default=10)
     p.add_argument("--first-seed", type=int, default=0)
     p.add_argument("--warmup", type=int, default=5, help="replans on the base state before the change")
@@ -65,10 +70,11 @@ def _load_params(path):
 def main():
     a = parse_args()
     cfg = ExperimentConfig(phase=a.phase, scenario=a.source, fractions=tuple(a.fractions),
-                           localities=tuple(a.localities), kind=a.kind, trials=a.trials, first_seed=a.first_seed,
+                           localities=tuple(a.localities), kind=a.kind, direction=a.direction, trials=a.trials, first_seed=a.first_seed,
                            warmup=a.warmup, ants=a.ants, iterations=a.iterations, vns_evaluations=a.vns_evals,
                            n_points=a.points, drones=a.drones, cell_size_m=a.cell_size, workers=a.workers,
-                           params=_load_params(a.params))
+                           params=_load_params(a.params), selective_radius_m=a.selective_radius,
+                           planners=tuple(a.planners))
     print(f"budget per replan: ACO {cfg.ants * cfg.iterations} evaluations, VNS {cfg.vns_params().max_evaluations}")
     if a.source == "synthetic":
         rows, traces = run_synthetic(cfg)

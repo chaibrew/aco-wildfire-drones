@@ -120,3 +120,47 @@ def test_mission_rows_and_truth_scoring(field):
     assert all(0 <= r["front_on_map_fraction"] <= 1 for r in rows)
     with pytest.raises(ValueError):
         run_mission(field, smoke_router, MissionConfig(), start_s=3 * DAY)
+
+
+def test_accuracy_matches_snapshot_score_at_snapshot_time(field):
+    fire_map = FireMap(field, cell_size_m=500)
+    fire_map.ingest_snapshot(0)
+    score = fire_map.score_snapshot(1)
+    accuracy = fire_map.accuracy(DAY)
+    assert accuracy["perimeter_error_m"] == pytest.approx(score["perimeter_error_m"])
+    assert accuracy["growth_found_fraction"] == pytest.approx(score["discovered_growth_fraction"])
+    assert accuracy["perimeter_error_p95_m"] >= accuracy["perimeter_error_m"] > 0
+
+
+def test_accuracy_perfect_and_stale_maps(field):
+    fire_map = FireMap(field, cell_size_m=500)
+    fire_map.ingest_snapshot(0)
+    fresh = fire_map.accuracy(0.0)
+    assert fresh["perimeter_error_m"] == 0.0 and fresh["growth_found_fraction"] == 1.0
+    assert fresh["known_burned_fraction"] == 1.0
+    stale = [fire_map.accuracy(t) for t in (DAY / 4, DAY / 2, DAY)]
+    errors = [a["perimeter_error_m"] for a in stale]
+    assert errors == sorted(errors) and errors[-1] > errors[0]
+    fire_map.known = field.arrival_s <= DAY / 2
+    assert fire_map.accuracy(DAY / 2)["perimeter_error_m"] == 0.0
+
+
+def test_mission_rows_report_map_accuracy(field):
+    from aco_router import summary
+    from fire_sim.simulation import smoke_router
+    rows, _ = run_mission(field, smoke_router, MissionConfig(cell_size_m=500, drones=2), stop_s=3 * 3600)
+    for r in rows:
+        assert r["perimeter_error_m"] >= 0 and r["perimeter_error_p95_m"] >= r["perimeter_error_m"]
+        assert 0 <= r["growth_found_fraction"] <= 1 and 0 <= r["known_burned_fraction"] <= 1
+    s = summary(rows)
+    assert s["perimeter_error_mean_m"] == pytest.approx(np.mean([r["perimeter_error_m"] for r in rows]))
+    assert 0 <= s["growth_found_mean"] <= 1
+
+
+def test_flying_beats_idling_on_map_accuracy(field):
+    from fire_sim.simulation import smoke_router
+    config = MissionConfig(cell_size_m=500, drones=3)
+    flying, _ = run_mission(field, smoke_router, config, stop_s=DAY / 2)
+    idle, _ = run_mission(field, lambda state: {d.id: [] for d in state.drones}, config, stop_s=DAY / 2)
+    assert np.mean([r["perimeter_error_m"] for r in flying]) < np.mean([r["perimeter_error_m"] for r in idle])
+    assert np.mean([r["growth_found_fraction"] for r in flying]) > np.mean([r["growth_found_fraction"] for r in idle])

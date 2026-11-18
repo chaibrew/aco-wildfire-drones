@@ -13,6 +13,12 @@ What "affected" means (`kind`)
             (the front moved: one "removed" + one "added")
   mixed   : alternate the two over the affected points (default)
 
+Direction of a risk change (`direction`)
+  cycle : 1 -> 2 -> 3 -> 1 (original rule; a picked risk-3 point drops two tiers, so the share of
+          drops depends on how many risk-3 points the base state has)
+  up    : one tier up (the fire is spreading faster there); a risk-3 point cannot go up, so it
+          advances instead (the fast front leaves its cell)
+
 The realised magnitude is measured with the same definition the repo uses
 (`fire_sim.models.changes(...).fraction`): |added u removed u changed| / |previous u current|.
 """
@@ -27,6 +33,7 @@ from fire_sim.simulation import PlanningState, coverage
 
 LOCALITIES = ("concentrated", "distributed")
 KINDS = ("risk", "advance", "mixed")
+DIRECTIONS = ("cycle", "up")
 
 
 @dataclass(frozen=True)
@@ -34,6 +41,7 @@ class ChangeSpec:
     fraction: float  # target |added u removed u changed| / |previous u current|
     locality: str = "concentrated"
     kind: str = "mixed"
+    direction: str = "cycle"
 
     def __post_init__(self) -> None:
         if not 0.0 <= self.fraction < 1.0:
@@ -42,6 +50,8 @@ class ChangeSpec:
             raise ValueError(f"locality must be one of {LOCALITIES}")
         if self.kind not in KINDS:
             raise ValueError(f"kind must be one of {KINDS}")
+        if self.direction not in DIRECTIONS:
+            raise ValueError(f"direction must be one of {DIRECTIONS}")
 
 
 @dataclass(frozen=True)
@@ -106,6 +116,8 @@ def apply_change(state: PlanningState, spec: ChangeSpec, seed: int, *, cell_size
     for pos, i in enumerate(affected):
         p = state.points[i]
         do_advance = spec.kind == "advance" or (spec.kind == "mixed" and pos % 2 == 1)
+        if not do_advance and spec.direction == "up" and p.risk == 3:
+            do_advance = True
         if do_advance:
             moved = _advance(p, cx, cy, cell_size_m, points)
             if moved is not None:
@@ -114,7 +126,7 @@ def apply_change(state: PlanningState, spec: ChangeSpec, seed: int, *, cell_size
                 last_seen[moved.id] = state.time_s  # activation is not an observation
                 continue
         # risk change (also the fallback when the outward cell is taken)
-        risk = p.risk % 3 + 1
+        risk = min(3, p.risk + 1) if spec.direction == "up" else p.risk % 3 + 1
         base = p.revisit_s * p.risk
         points[i] = MonitoringPoint(i, p.x, p.y, risk, base / risk)
 

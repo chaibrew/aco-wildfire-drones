@@ -1,0 +1,23 @@
+{
+  "params": {
+    "n_ants": 10,
+    "alpha": 1.0,
+    "beta": 1.0,
+    "rho": 0.1,
+    "deposit_q": 1.0,
+    "tau0_mode": "nearest_neighbour",
+    "tau0_constant": 1.0,
+    "rho_high": 0.5,
+    "fast_evaporation_iterations": 10,
+    "urgency_weight": 2.0,
+    "urgency_floor": 0.05,
+    "use_bounds": true,
+    "tau_min_ratio": 0.01,
+    "budget_kind": "iterations",
+    "max_iterations": 15,
+    "time_budget_s": 10.0,
+    "selective_radius_m": 0.0,
+    "change_trigger": "any"
+  },
+  "source": "tuning.space.UNTUNED_PARAMS (pre-tuning values used in the progress check)"
+}

@@ -35,7 +35,7 @@ class SelectiveReset(PheromoneStrategy):
     name = StrategyName.SELECTIVE_RESET
 
     def on_change(self, pheromone: PheromoneMatrix, change: ChangeEvent, tau0: float) -> None:
-        pheromone.reset_touching(change.affected, tau0)
+        pheromone.reset_touching(change.reset_scope, tau0)
 
 
 class FastEvaporation(PheromoneStrategy):

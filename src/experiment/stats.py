@@ -236,3 +236,94 @@ def format_interactions(results: list[dict]) -> str:
                      f"W p {r['wilcoxon_p']:.3f}  trials favouring A {r['trials_favouring_a']}/{r['n_clusters']}")
         lines.append(f"{'':>16s}-> {r['reading']}")
     return "\n".join(lines)
+
+def _incumbent_at(points: list[tuple[float, float]], checkpoint: float) -> float | None:
+    value = None
+    for e, v in points:
+        if e > checkpoint:
+            break
+        value = v
+    return value
+
+
+def recovery_summary(trace_rows: list[dict], value: str = "best_total_overdue", reference: str = "aco_full_reset",
+                     checkpoints=(20, 60, 120, 300, 600, 1200), include_pilot: bool = False) -> list[dict]:
+    runs = defaultdict(list)
+    for r in trace_rows:
+        if not include_pilot and r.get("phase", "final") == "pilot":
+            continue
+        key = (r["planner"], r["scenario"], r["trial"], float(r["target_fraction"]), r["locality"])
+        runs[key].append((float(r["evaluations"]), float(r[value])))
+    at = defaultdict(dict)
+    for (planner, *pair), pts in runs.items():
+        pts.sort()
+        for cp in checkpoints:
+            v = _incumbent_at(pts, cp)
+            if v is not None:
+                at[(planner, cp)][tuple(pair)] = v
+    out = []
+    for cp in checkpoints:
+        ref = at.get((reference, cp), {})
+        members = []
+        for planner in PLANNER_ORDER:
+            vals = at.get((planner, cp))
+            if not vals:
+                continue
+            row = {"evaluations": cp, "planner": planner, "n": len(vals), "median": statistics.median(vals.values()),
+                   "mean": statistics.mean(vals.values())}
+            if planner != reference and ref:
+                by_cluster = defaultdict(list)
+                for pair, v in vals.items():
+                    if pair in ref:
+                        by_cluster[(pair[0], pair[1])].append(v - ref[pair])
+                diffs = [statistics.mean(d) for d in by_cluster.values()]
+                lo, hi = _t_ci(diffs)
+                t_p, w_p = _p_values(diffs)
+                row.update(n_clusters=len(diffs), mean_diff=statistics.mean(diffs) if diffs else float("nan"),
+                           ci_lo=lo, ci_hi=hi, t_p=t_p, wilcoxon_p=w_p, better=sum(d < 0 for d in diffs),
+                           worse=sum(d > 0 for d in diffs))
+                members.append(row)
+            out.append(row)
+        for r, adj in zip(members, holm_adjust([r["t_p"] for r in members])):
+            r["t_p_holm"] = adj
+    return out
+
+
+def format_recovery(summary: list[dict], value: str, reference: str) -> str:
+    lines = [f"recovery: {value} of the best plan after k evaluations (lower is better); diff = planner - "
+             f"{reference}, averaged within each trial; t p(H) Holm-adjusted across planners at each k", "",
+             f"{'evals':>6s}  {'planner':22s} {'median':>9s} {'diff':>9s} {'95% CI':>19s} {'t p(H)':>7s} {'b/w':>7s}"]
+    for r in summary:
+        tail = ""
+        if "mean_diff" in r:
+            tail = (f" {r['mean_diff']:+9.3f} [{r['ci_lo']:+8.3f},{r['ci_hi']:+8.3f}] {r.get('t_p_holm', float('nan')):7.3f}"
+                    f" {r['better']:>3d}/{r['worse']:<3d}")
+        lines.append(f"{r['evaluations']:>6g}  {r['planner']:22s} {r['median']:9.3f}{tail}")
+    return "\n".join(lines)
+
+
+def reset_share_summary(rows: list[dict], metric: str = "total_overdue",
+                        bins=(0.0, 0.1, 0.25, 0.5, 1.01)) -> list[dict]:
+    by_pair = defaultdict(dict)
+    share = {}
+    for r in rows:
+        pair = (r["scenario"], r["trial"], r["target_fraction"], r["locality"])
+        by_pair[pair][r["planner"]] = r[metric]
+        if r["planner"] == "aco_selective_reset" and r.get("reset_points") not in ("", None):
+            share[pair] = float(r["reset_points"]) / max(1.0, float(r["n_after"]))
+    out = []
+    for lo, hi in zip(bins, bins[1:]):
+        for ref in ("aco_retention", "aco_full_reset"):
+            by_cluster = defaultdict(list)
+            for pair, s in share.items():
+                v = by_pair[pair]
+                if lo <= s < hi and "aco_selective_reset" in v and ref in v:
+                    by_cluster[(pair[0], pair[1])].append(v["aco_selective_reset"] - v[ref])
+            diffs = [statistics.mean(d) for d in by_cluster.values()]
+            if not diffs:
+                continue
+            ci_lo, ci_hi = _t_ci(diffs)
+            out.append({"share_lo": lo, "share_hi": min(hi, 1.0), "reference": ref, "n_clusters": len(diffs),
+                        "n_pairs": sum(len(d) for d in by_cluster.values()), "mean_diff": statistics.mean(diffs),
+                        "ci_lo": ci_lo, "ci_hi": ci_hi})
+    return out

@@ -123,3 +123,21 @@ class FireMap:
     def known_fraction(self, t):
         truth = self.field.arrival_s <= t
         return float((self.known & truth).sum() / max(1, truth.sum()))
+
+    def accuracy(self, t):
+        field = self.field
+        truth = field.arrival_s <= t
+        true_edge = truth & ndimage.binary_dilation(~truth, FOUR, border_value=0)
+        map_edge = self._perimeter()
+        if map_edge.any() and true_edge.any():
+            distance = (ndimage.distance_transform_edt(~map_edge) * field.raster.res)[true_edge]
+            error, p95 = float(distance.mean()), float(np.percentile(distance, 95))
+        else:
+            error = p95 = float("nan")
+        if self.snapshots_ingested:
+            growth = truth & ~(field.arrival_s <= field.snapshot_s[self.snapshots_ingested[-1]])
+        else:
+            growth = truth
+        found = float((self.known & growth).sum() / growth.sum()) if growth.any() else 1.0
+        return {"perimeter_error_m": error, "perimeter_error_p95_m": p95, "growth_found_fraction": found,
+                "known_burned_fraction": float((self.known & truth).sum() / max(1, truth.sum()))}
