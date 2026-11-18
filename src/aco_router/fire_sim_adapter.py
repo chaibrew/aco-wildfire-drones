@@ -56,6 +56,11 @@ class FireSimRouter:
         return result.plan.for_drones(instance.drone_ids)
 
 
+def _mean(rows: list[Mapping[str, Any]], key: str) -> float:
+    values = [r[key] for r in rows if key in r and r[key] == r[key]]
+    return sum(values) / len(values) if values else float("nan")
+
+
 def summary(rows: list[Mapping[str, Any]]) -> dict[str, float]:
     n = max(1, len(rows))
     return {
@@ -66,5 +71,9 @@ def summary(rows: list[Mapping[str, Any]]) -> dict[str, float]:
         "true_J_mean": sum(r["true_objective"] for r in rows) / n,
         "true_overdue_mean": sum(r["true_overdue_count"] for r in rows) / n,
         "front_on_map_mean": sum(r["front_on_map_fraction"] for r in rows) / n,
+        "perimeter_error_mean_m": _mean(rows, "perimeter_error_m"),
+        "perimeter_error_p95_mean_m": _mean(rows, "perimeter_error_p95_m"),
+        "growth_found_mean": _mean(rows, "growth_found_fraction"),
+        "known_burned_mean": _mean(rows, "known_burned_fraction"),
         "planning_s_mean": sum(r["planning_s"] for r in rows) / n,
     }

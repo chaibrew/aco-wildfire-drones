@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from dataclasses import replace
 
 from .config import (
     COUNT_Q_CHANGE_AS_MODIFIED,
@@ -42,3 +43,16 @@ def diff_instances(
     else:
         scope = ChangeScope.WIDESPREAD
     return ChangeEvent(frozenset(added), frozenset(removed), frozenset(modified), fraction, scope)
+
+
+def with_neighbourhood(change: ChangeEvent, old: MissionInstance, new: MissionInstance,
+                       radius_m: float) -> ChangeEvent:
+    if radius_m <= 0 or change.is_empty:
+        return change
+    centres = [(new.point(i).x, new.point(i).y) for i in change.added | change.modified]
+    centres += [(old.point(i).x, old.point(i).y) for i in change.removed]
+    near = set()
+    for p in new.points:
+        if any(math.hypot(p.x - x, p.y - y) <= radius_m + 1e-6 for x, y in centres):
+            near.add(p.id)
+    return replace(change, neighbourhood=frozenset(near))

@@ -97,6 +97,7 @@ def run_mission(field, router, config=MissionConfig(), *, start_s=None, stop_s=N
         satellite = [s for s in field.snapshot_s if t <= s < t + horizon]
         true_points, true_result = truth.score(t, t + horizon, result.visits, positions, satellite)
         believed, actual = set(points), set(true_points)
+        accuracy = fire_map.accuracy(t + horizon)
         rows.append({
             "stage": stage, "block": block, "time_s": t, "horizon_s": horizon,
             "snapshot_delivered": ",".join(map(str, delivered)),
@@ -108,7 +109,7 @@ def run_mission(field, router, config=MissionConfig(), *, start_s=None, stop_s=N
             "true_front_points": len(true_points), "true_objective": true_result["objective"],
             "true_overdue_count": true_result["overdue_count"], "true_max_gap_s": true_result["max_gap_s"],
             "front_on_map_fraction": len(actual & believed) / max(1, len(actual)),
-            "known_burned_fraction": fire_map.known_fraction(t + horizon),
+            **accuracy,
             "total_distance_m": result.total_distance_m, "longest_route_m": result.longest_route_m})
         if record:
             record(stage, fire_map, points, routes)

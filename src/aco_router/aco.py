@@ -7,8 +7,9 @@ from typing import Callable
 
 import numpy as np
 
-from .changes import diff_instances
+from .changes import diff_instances, with_neighbourhood
 from .config import (
+    ChangeScope,
     COST_EPS,
     DEFAULT_ACO_PARAMS,
     DISTANCE_EPS_M,
@@ -178,13 +179,19 @@ class ACORouter:
             if change is None:
                 change = diff_instances(self._last_instance, ctx.instance)
             self._pheromone = self._pheromone.remapped(ctx.keys, self._tau0)
-            if change.is_empty:
+            if change.is_empty or not self._triggers(change):
                 self._iters_since_change = None
             else:
+                if self.params.selective_radius_m > 0:
+                    change = with_neighbourhood(change, self._last_instance, ctx.instance,
+                                                self.params.selective_radius_m)
                 self.strategy.on_change(self._pheromone, change, self._tau0)
                 self._iters_since_change = 0
             self.last_change = change
         self._last_instance = ctx.instance
+
+    def _triggers(self, change: ChangeEvent) -> bool:
+        return self.params.change_trigger == "any" or change.scope is ChangeScope.WIDESPREAD
 
     def _initial_tau0(self, ctx: _Context) -> float:
         p = self.params

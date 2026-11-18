@@ -138,10 +138,15 @@ class ChangeEvent:
     modified: frozenset = frozenset()
     fraction: float = 0.0
     scope: ChangeScope = ChangeScope.NONE
+    neighbourhood: frozenset = frozenset()
 
     @property
     def affected(self) -> frozenset:
         return frozenset(self.added | self.modified)
+
+    @property
+    def reset_scope(self) -> frozenset:
+        return self.affected | self.neighbourhood
 
     @property
     def is_empty(self) -> bool:

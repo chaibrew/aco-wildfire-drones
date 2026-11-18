@@ -10,8 +10,9 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from experiment.stats import (GROUPINGS, METRICS, change_interaction, format_interactions, format_summary,  # noqa: E402
-                              load_rows, load_trace, paired_summary, trace_summary)
+from experiment.stats import (GROUPINGS, METRICS, change_interaction, format_interactions,  # noqa: E402
+                              format_recovery, format_summary, load_rows, load_trace, paired_summary,
+                              recovery_summary, reset_share_summary)
 
 
 def main():
@@ -24,6 +25,9 @@ def main():
     p.add_argument("--split", type=float, default=0.5, help="fraction cut-off between small and large changes")
     p.add_argument("--no-interaction", action="store_true")
     p.add_argument("--trace", help="trace csv (default: <csv stem>_trace.csv if it exists)")
+    p.add_argument("--recovery-value", default="best_margin",
+                   choices=("best_total_overdue", "best_margin", "best_objective"))
+    p.add_argument("--checkpoints", type=float, nargs="+", default=[20, 60, 120, 300, 600, 1200])
     a = p.parse_args()
 
     rows = load_rows(a.csv, include_pilot=a.include_pilot)
@@ -41,11 +45,20 @@ def main():
         print("Does selective reset do relatively better after concentrated / small changes?\n")
         print(format_interactions(results), "\n")
 
+    if any(r.get("reset_points") not in ("", None) for r in rows):
+        print("Selective reset by the share of points it actually reset (diff = selective - reference, "
+              f"{a.metric[0]}, averaged within each trial)\n")
+        for r in reset_share_summary(rows, a.metric[0]):
+            print(f"  reset share [{r['share_lo']:.2f},{r['share_hi']:.2f})  vs {r['reference']:16s} "
+                  f"{r['mean_diff']:+8.3f}  95% CI [{r['ci_lo']:+.3f},{r['ci_hi']:+.3f}]  "
+                  f"trials {r['n_clusters']}  pairs {r['n_pairs']}")
+        print()
+
     trace_path = a.trace or (a.csv[:-4] if a.csv.endswith(".csv") else a.csv) + "_trace.csv"
     if os.path.exists(trace_path):
-        print("median best margin after a change, by evaluations used")
-        for r in trace_summary(load_trace(trace_path)):
-            print(f"  {r['planner']:22s} evals={r['evaluations']:<5g} {r['median_best_margin']:8.3f}  (n={r['n']})")
+        summary = recovery_summary(load_trace(trace_path), a.recovery_value, a.reference, tuple(a.checkpoints),
+                                   include_pilot=a.include_pilot)
+        print(format_recovery(summary, a.recovery_value, a.reference))
 
 
 if __name__ == "__main__":
