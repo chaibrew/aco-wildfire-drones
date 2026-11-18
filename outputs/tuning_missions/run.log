@@ -1,0 +1,161 @@
+[1/160   117s] untuned full_reset       seed 0 d 6 true overdue 55.81
+[2/160   119s] untuned selective_reset  seed 0 d 6 true overdue 55.53
+[3/160   121s] untuned retention        seed 0 d 6 true overdue 55.03
+[4/160   121s] untuned fast_evaporation seed 0 d 6 true overdue 55.51
+[5/160   123s] untuned retention        seed 1 d 6 true overdue 55.97
+[6/160   144s] tuned   full_reset       seed 0 d 6 true overdue 52.43
+[7/160   146s] tuned   fast_evaporation seed 0 d 6 true overdue 52.49
+[8/160   147s] tuned   selective_reset  seed 0 d 6 true overdue 53.15
+[9/160   149s] tuned   retention        seed 0 d 6 true overdue 51.31
+[10/160   233s] untuned selective_reset  seed 1 d 6 true overdue 55.26
+[11/160   234s] untuned fast_evaporation seed 1 d 6 true overdue 55.88
+[12/160   252s] untuned full_reset       seed 1 d 6 true overdue 56.17
+[13/160   259s] tuned   retention        seed 1 d 6 true overdue 53.00
+[14/160   261s] tuned   fast_evaporation seed 1 d 6 true overdue 53.02
+[15/160   262s] tuned   selective_reset  seed 1 d 6 true overdue 53.79
+[16/160   264s] untuned retention        seed 2 d 6 true overdue 55.56
+[17/160   286s] tuned   full_reset       seed 1 d 6 true overdue 53.81
+[18/160   294s] tuned   retention        seed 2 d 6 true overdue 53.26
+[19/160   348s] untuned fast_evaporation seed 2 d 6 true overdue 56.31
+[20/160   363s] untuned selective_reset  seed 2 d 6 true overdue 56.00
+[21/160   372s] untuned full_reset       seed 2 d 6 true overdue 56.78
+[22/160   377s] tuned   fast_evaporation seed 2 d 6 true overdue 53.81
+[23/160   382s] untuned retention        seed 3 d 6 true overdue 55.42
+[24/160   403s] tuned   full_reset       seed 2 d 6 true overdue 53.38
+[25/160   404s] tuned   selective_reset  seed 2 d 6 true overdue 52.67
+[26/160   409s] untuned fast_evaporation seed 3 d 6 true overdue 55.40
+[27/160   429s] tuned   retention        seed 3 d 6 true overdue 52.71
+[28/160   476s] untuned selective_reset  seed 3 d 6 true overdue 55.42
+[29/160   487s] untuned full_reset       seed 3 d 6 true overdue 56.42
+[30/160   492s] tuned   fast_evaporation seed 3 d 6 true overdue 53.38
+[31/160   511s] tuned   selective_reset  seed 3 d 6 true overdue 53.19
+[32/160   520s] untuned retention        seed 4 d 6 true overdue 56.17
+[33/160   522s] tuned   full_reset       seed 3 d 6 true overdue 53.22
+[34/160   524s] untuned fast_evaporation seed 4 d 6 true overdue 57.60
+[35/160   546s] tuned   retention        seed 4 d 6 true overdue 53.83
+[36/160   568s] tuned   fast_evaporation seed 4 d 6 true overdue 53.68
+[37/160   584s] untuned selective_reset  seed 4 d 6 true overdue 56.45
+[38/160   601s] untuned full_reset       seed 4 d 6 true overdue 56.25
+[39/160   630s] tuned   selective_reset  seed 4 d 6 true overdue 52.97
+[40/160   640s] untuned retention        seed 5 d 6 true overdue 54.96
+[41/160   643s] untuned fast_evaporation seed 5 d 6 true overdue 54.90
+[42/160   652s] tuned   full_reset       seed 4 d 6 true overdue 54.38
+[43/160   667s] tuned   retention        seed 5 d 6 true overdue 52.25
+[44/160   681s] untuned selective_reset  seed 5 d 6 true overdue 54.88
+[45/160   691s] tuned   fast_evaporation seed 5 d 6 true overdue 52.53
+[46/160   709s] untuned full_reset       seed 5 d 6 true overdue 55.55
+[47/160   726s] tuned   selective_reset  seed 5 d 6 true overdue 53.33
+[48/160   755s] untuned retention        seed 6 d 6 true overdue 55.27
+[49/160   765s] untuned fast_evaporation seed 6 d 6 true overdue 55.28
+[50/160   768s] tuned   full_reset       seed 5 d 6 true overdue 52.41
+[51/160   784s] tuned   retention        seed 6 d 6 true overdue 53.17
+[52/160   791s] untuned selective_reset  seed 6 d 6 true overdue 54.67
+[53/160   806s] tuned   fast_evaporation seed 6 d 6 true overdue 52.65
+[54/160   817s] untuned full_reset       seed 6 d 6 true overdue 56.78
+[55/160   832s] tuned   selective_reset  seed 6 d 6 true overdue 53.14
+[56/160   861s] tuned   full_reset       seed 6 d 6 true overdue 53.32
+[57/160   869s] untuned retention        seed 7 d 6 true overdue 55.50
+[58/160   883s] untuned fast_evaporation seed 7 d 6 true overdue 54.89
+[59/160   902s] untuned selective_reset  seed 7 d 6 true overdue 55.48
+[60/160   905s] tuned   retention        seed 7 d 6 true overdue 53.88
+[61/160   926s] untuned full_reset       seed 7 d 6 true overdue 56.22
+[62/160   926s] tuned   fast_evaporation seed 7 d 6 true overdue 53.42
+[63/160   948s] tuned   selective_reset  seed 7 d 6 true overdue 52.95
+[64/160   973s] tuned   full_reset       seed 7 d 6 true overdue 53.31
+[65/160   977s] untuned retention        seed 8 d 6 true overdue 55.77
+[66/160  1000s] untuned fast_evaporation seed 8 d 6 true overdue 55.67
+[67/160  1013s] tuned   retention        seed 8 d 6 true overdue 52.60
+[68/160  1018s] untuned selective_reset  seed 8 d 6 true overdue 55.53
+[69/160  1038s] untuned full_reset       seed 8 d 6 true overdue 55.93
+[70/160  1045s] tuned   fast_evaporation seed 8 d 6 true overdue 53.39
+[71/160  1070s] tuned   selective_reset  seed 8 d 6 true overdue 52.40
+[72/160  1090s] tuned   full_reset       seed 8 d 6 true overdue 52.56
+[73/160  1091s] untuned retention        seed 9 d 6 true overdue 55.05
+[74/160  1118s] untuned fast_evaporation seed 9 d 6 true overdue 55.81
+[75/160  1120s] tuned   retention        seed 9 d 6 true overdue 52.38
+[76/160  1132s] untuned selective_reset  seed 9 d 6 true overdue 55.09
+[77/160  1156s] untuned full_reset       seed 9 d 6 true overdue 55.92
+[78/160  1157s] tuned   fast_evaporation seed 9 d 6 true overdue 53.20
+[79/160  1184s] tuned   selective_reset  seed 9 d 6 true overdue 52.26
+[80/160  1212s] tuned   full_reset       seed 9 d 6 true overdue 53.90
+[81/160  1299s] untuned retention        seed 0 d12 true overdue 37.73
+[82/160  1321s] untuned fast_evaporation seed 0 d12 true overdue 38.60
+[83/160  1325s] untuned selective_reset  seed 0 d12 true overdue 39.23
+[84/160  1344s] untuned full_reset       seed 0 d12 true overdue 40.66
+[85/160  1368s] tuned   retention        seed 0 d12 true overdue 30.78
+[86/160  1388s] tuned   fast_evaporation seed 0 d12 true overdue 32.03
+[87/160  1416s] untuned retention        seed 1 d12 true overdue 38.42
+[88/160  1420s] tuned   selective_reset  seed 0 d12 true overdue 31.45
+[89/160  1447s] tuned   full_reset       seed 0 d12 true overdue 32.49
+[90/160  1522s] untuned fast_evaporation seed 1 d12 true overdue 40.28
+[91/160  1538s] untuned selective_reset  seed 1 d12 true overdue 40.42
+[92/160  1573s] tuned   retention        seed 1 d12 true overdue 33.47
+[93/160  1578s] untuned full_reset       seed 1 d12 true overdue 41.48
+[94/160  1594s] tuned   fast_evaporation seed 1 d12 true overdue 34.83
+[95/160  1623s] untuned retention        seed 2 d12 true overdue 37.71
+[96/160  1638s] tuned   selective_reset  seed 1 d12 true overdue 32.04
+[97/160  1679s] tuned   full_reset       seed 1 d12 true overdue 33.13
+[98/160  1718s] tuned   retention        seed 2 d12 true overdue 32.62
+[99/160  1723s] untuned fast_evaporation seed 2 d12 true overdue 39.29
+[100/160  1764s] untuned selective_reset  seed 2 d12 true overdue 39.33
+[101/160  1777s] untuned full_reset       seed 2 d12 true overdue 40.64
+[102/160  1801s] tuned   fast_evaporation seed 2 d12 true overdue 33.76
+[103/160  1833s] tuned   selective_reset  seed 2 d12 true overdue 32.58
+[104/160  1840s] untuned retention        seed 3 d12 true overdue 38.67
+[105/160  1880s] tuned   full_reset       seed 2 d12 true overdue 33.58
+[106/160  1915s] untuned fast_evaporation seed 3 d12 true overdue 39.41
+[107/160  1946s] tuned   retention        seed 3 d12 true overdue 33.33
+[108/160  1956s] untuned selective_reset  seed 3 d12 true overdue 39.86
+[109/160  1990s] untuned full_reset       seed 3 d12 true overdue 41.99
+[110/160  1991s] tuned   fast_evaporation seed 3 d12 true overdue 32.04
+[111/160  2040s] tuned   selective_reset  seed 3 d12 true overdue 33.53
+[112/160  2049s] untuned retention        seed 4 d12 true overdue 38.24
+[113/160  2107s] tuned   full_reset       seed 3 d12 true overdue 33.82
+[114/160  2134s] untuned fast_evaporation seed 4 d12 true overdue 40.74
+[115/160  2167s] tuned   retention        seed 4 d12 true overdue 33.44
+[116/160  2171s] untuned selective_reset  seed 4 d12 true overdue 41.43
+[117/160  2206s] untuned full_reset       seed 4 d12 true overdue 41.35
+[118/160  2243s] tuned   fast_evaporation seed 4 d12 true overdue 33.19
+[119/160  2286s] tuned   selective_reset  seed 4 d12 true overdue 32.75
+[120/160  2287s] untuned retention        seed 5 d12 true overdue 37.69
+[121/160  2343s] tuned   full_reset       seed 4 d12 true overdue 34.31
+[122/160  2360s] untuned fast_evaporation seed 5 d12 true overdue 38.15
+[123/160  2390s] untuned selective_reset  seed 5 d12 true overdue 38.73
+[124/160  2406s] tuned   retention        seed 5 d12 true overdue 30.64
+[125/160  2450s] untuned full_reset       seed 5 d12 true overdue 40.19
+[126/160  2462s] tuned   fast_evaporation seed 5 d12 true overdue 31.49
+[127/160  2494s] tuned   selective_reset  seed 5 d12 true overdue 32.20
+[128/160  2508s] untuned retention        seed 6 d12 true overdue 38.06
+[129/160  2564s] tuned   full_reset       seed 5 d12 true overdue 32.68
+[130/160  2567s] untuned fast_evaporation seed 6 d12 true overdue 39.10
+[131/160  2598s] untuned selective_reset  seed 6 d12 true overdue 38.84
+[132/160  2615s] tuned   retention        seed 6 d12 true overdue 31.40
+[133/160  2649s] untuned full_reset       seed 6 d12 true overdue 40.81
+[134/160  2664s] tuned   fast_evaporation seed 6 d12 true overdue 32.40
+[135/160  2713s] tuned   selective_reset  seed 6 d12 true overdue 32.30
+[136/160  2714s] untuned retention        seed 7 d12 true overdue 38.61
+[137/160  2756s] tuned   full_reset       seed 6 d12 true overdue 33.62
+[138/160  2767s] untuned fast_evaporation seed 7 d12 true overdue 39.26
+[139/160  2803s] untuned selective_reset  seed 7 d12 true overdue 39.37
+[140/160  2827s] tuned   retention        seed 7 d12 true overdue 32.69
+[141/160  2848s] untuned full_reset       seed 7 d12 true overdue 41.21
+[142/160  2858s] tuned   fast_evaporation seed 7 d12 true overdue 32.98
+[143/160  2906s] tuned   selective_reset  seed 7 d12 true overdue 32.45
+[144/160  2914s] untuned retention        seed 8 d12 true overdue 38.62
+[145/160  2964s] untuned fast_evaporation seed 8 d12 true overdue 39.88
+[146/160  2973s] tuned   full_reset       seed 7 d12 true overdue 33.19
+[147/160  3019s] untuned selective_reset  seed 8 d12 true overdue 40.22
+[148/160  3022s] tuned   retention        seed 8 d12 true overdue 34.37
+[149/160  3042s] untuned full_reset       seed 8 d12 true overdue 39.97
+[150/160  3065s] tuned   fast_evaporation seed 8 d12 true overdue 33.26
+[151/160  3110s] tuned   selective_reset  seed 8 d12 true overdue 32.82
+[152/160  3118s] untuned retention        seed 9 d12 true overdue 36.92
+[153/160  3160s] tuned   full_reset       seed 8 d12 true overdue 31.52
+[154/160  3161s] untuned fast_evaporation seed 9 d12 true overdue 38.34
+[155/160  3197s] untuned selective_reset  seed 9 d12 true overdue 40.24
+[156/160  3211s] tuned   retention        seed 9 d12 true overdue 33.03
+[157/160  3222s] untuned full_reset       seed 9 d12 true overdue 40.16
+[158/160  3241s] tuned   fast_evaporation seed 9 d12 true overdue 31.92
+[159/160  3252s] tuned   selective_reset  seed 9 d12 true overdue 32.40
+[160/160  3293s] tuned   full_reset       seed 9 d12 true overdue 33.04
+done 3293s
