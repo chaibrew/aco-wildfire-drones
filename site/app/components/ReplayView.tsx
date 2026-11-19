@@ -1,11 +1,11 @@
 "use client";
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { memo, useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ReferenceLine, XAxis, YAxis } from "recharts";
 import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/chart";
 import { decodeRun, dronePos, getJSON, readQuery, stageAt, stagePheromone, stagePoints, useJSON, writeQuery, type Index, type Iso, type RawRun, type Run, type XY } from "@/lib/data";
 import { PLANNER, SHOWN_SETTINGS, SIDE_COLOR, STALE_BINS, hhmm, plannerColor, plannerLabel, plannerShort, settingOf, staleColor, strategyOf } from "@/lib/planners";
-import { BigStat, CountLine, KeyList, KeyRow, MetricRow, StatCard } from "./StatsDisplay";
+import { CountLine, MetricRow, StatCard } from "./StatsDisplay";
 import { DroneIcon, DroneSprite, FireMap, LegendItem, Ln, Pixel, Sq, heading, polyline, rotorFrame, type Proj, type Tip } from "./FireMap";
 import { Field, Seg, Select, Toggle } from "./Controls";
 
@@ -224,19 +224,22 @@ export default function ReplayView() {
 
       <div className="grid gap-6 min-[961px]:grid-cols-[minmax(320px,380px)_minmax(0,1fr)] min-[961px]:items-end">
         <section aria-label="Live numbers" className="flex flex-col gap-y-6 md:gap-y-8 pb-2">
-          <BigStat
-            label="Edge points overdue"
-            value={stA?.true_over ?? "–"}
-            sub={stA ? <>of {stA.front} on the true fire edge · {hhmm(t)}</> : "…"}
-          />
-          <KeyList label="Planners · now / mission mean">
-            {runs && (
-              <KeyRow color={SIDE_COLOR.a} code={`A ${compact(a)}`} value={stA?.true_over ?? "–"} sub={`${meanOf(runs.a).toFixed(1)} avg`} title={plannerLabel(a)} />
-            )}
-            {runs?.b && compare && (
-              <KeyRow color={SIDE_COLOR.b} code={`B ${compact(b)}`} value={stB?.true_over ?? "–"} sub={`${meanOf(runs.b).toFixed(1)} avg`} title={plannerLabel(b)} />
-            )}
-          </KeyList>
+          <div className="space-y-2">
+            <h2 className="my-0 font-mono font-medium text-sm tracking-tight uppercase text-gray-900">Edge points overdue · {hhmm(t)}</h2>
+            <div className={`grid gap-x-6 ${compare ? "grid-cols-2" : "grid-cols-1"}`}>
+              {(compare ? (["a", "b"] as const) : (["a"] as const)).map((w) => {
+                const run = w === "a" ? runs?.a : runs?.b, st = w === "a" ? stA : stB, key = w === "a" ? a : b;
+                return (
+                  <div key={w} className="min-w-0" title={plannerLabel(key)}>
+                    <div className="font-mono text-xs uppercase tracking-tight text-gray-900 truncate"><span style={{ color: SIDE_COLOR[w] }}>▲</span> {w.toUpperCase()} {compact(key)}</div>
+                    <div className="text-4xl md:text-5xl font-mono tabular-nums">{st?.true_over ?? "–"}</div>
+                    <div className="text-sm text-gray-900 font-mono tabular-nums">{run ? `${meanOf(run).toFixed(1)} avg` : "…"}</div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="text-sm text-gray-900 font-mono tabular-nums">{stA ? <>of {stA.front} points on the true fire edge</> : "…"}</div>
+          </div>
           <div>
             <CountLine value={drones} label="drones · replan every 10 min" />
             <CountLine value={runs && stA && stageAt(runs.a, t) > 0 ? `${Math.round(stA.changed * 100)}%` : "–"} label="of the map changed at this replan" />
