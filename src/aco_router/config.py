@@ -44,7 +44,7 @@ HORIZON_TOLERANCE_S: float = 1e-9
 
 @dataclass(frozen=True)
 class ACOParams:
-    # Tuned defaults (docs/tuning.md); pre-tuning values are in tuning.space.UNTUNED_PARAMS.
+    # Tuned defaults (docs/tuning.md); pre-tuning values are in tuning.tuner.UNTUNED_PARAMS.
     n_ants: int = 20
     alpha: float = 0.73
     beta: float = 2.49

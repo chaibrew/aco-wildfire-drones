@@ -50,7 +50,7 @@ def main():
     config = MissionConfig(cell_size_m=args.cell_size, drones=args.drones, horizon_s=600)
     base = ACOParams()
     if args.params:
-        from tuning.space import load_params
+        from tuning import load_params
         base = load_params(args.params)
     planners = make_planners(base.with_(n_ants=args.ants, max_iterations=args.iterations))
 

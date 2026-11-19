@@ -1,6 +1,6 @@
 # ACO parameter tuning
 
-This document describes how the ACO router's parameters were tuned, the results of each step, and the setting that was chosen. The code is in `src/tuning`, `scripts/tune_aco.py` and `scripts/confirm_tuning.py`. The raw results are written to `outputs/tuning/` (not in git; the commands at the end regenerate them, and every step is deterministic, so a rerun gives the same numbers).
+This document describes how the ACO router's parameters were tuned, the results of each step, and the setting that was chosen. The code is in `src/tuning/racing.py` (F-Race and the iterated race, independent of the ACO), `src/tuning/tuner.py` (the parameter space, tuning instances, scoring and result tables) and `scripts/tune_aco.py` (one subcommand per step). The raw results are written to `outputs/tuning/` (not in git; the commands at the end regenerate them, and every step is deterministic, so a rerun gives the same numbers).
 
 ## 1. Aims
 
@@ -59,7 +59,7 @@ The three measures are defined from P_i, the longest gap between observations of
 
 **F-Race** (Birattari et al., 2002) evaluates all candidate settings on one instance at a time. From the fifth instance on (`first_test` = 5), after each new instance a Friedman test checks whether the candidates' mean ranks differ by more than chance would explain. The Friedman test is a non-parametric test for several methods measured on the same set of problems. If it rejects at α = 0.05, a Conover post-hoc test drops every candidate whose rank sum is worse than the best rank sum by more than a critical difference. When only two candidates remain, a Wilcoxon signed-rank test is used instead. These are the statistics used by irace (López-Ibáñez et al., 2016). After a candidate is dropped, the earlier blocks are re-ranked without it. The race stops when one candidate is left or the instances run out; the survivor with the best mean rank is the race's pick.
 
-**Iterated race.** irace repeats the race. After each race it keeps the best survivors ("elites"), samples new candidates near them, and narrows the sampling spread, so later races search a smaller region around the settings that did well. The irace package runs in R, so a small Python version was written (`src/tuning/irace.py`). It follows irace's default rules: 2 + ⌊log₂ 6⌋ = 4 iterations for 6 parameters; the remaining budget is split evenly over the remaining iterations; up to 4 elites are kept; a new candidate takes an elite as its parent with probability proportional to its rank, and each parameter is drawn from a normal distribution around the parent's value (on a 0–1 scale, log scale for ρ, τ_min ratio and ε), with a standard deviation that starts at 0.5 and shrinks each iteration. It differs from irace in three ways: every race uses the same 30 instances in the same order (results already computed for a candidate on an instance are reused); elites can be dropped like any other candidate (irace protects them until new instances have been seen); and only numerical parameters are sampled. It was run with a budget of 1,000 (candidate, instance) evaluations, the same order of cost as the F-Race.
+**Iterated race.** irace repeats the race. After each race it keeps the best survivors ("elites"), samples new candidates near them, and narrows the sampling spread, so later races search a smaller region around the settings that did well. The irace package runs in R, so a small Python version was written (`IteratedRace` in `src/tuning/racing.py`). It follows irace's default rules: 2 + ⌊log₂ 6⌋ = 4 iterations for 6 parameters; the remaining budget is split evenly over the remaining iterations; up to 4 elites are kept; a new candidate takes an elite as its parent with probability proportional to its rank, and each parameter is drawn from a normal distribution around the parent's value (on a 0–1 scale, log scale for ρ, τ_min ratio and ε), with a standard deviation that starts at 0.5 and shrinks each iteration. It differs from irace in three ways: every race uses the same 30 instances in the same order (results already computed for a candidate on an instance are reused); elites can be dropped like any other candidate (irace protects them until new instances have been seen); and only numerical parameters are sampled. It was run with a budget of 1,000 (candidate, instance) evaluations, the same order of cost as the F-Race.
 
 The iterated race was run as a second, independent search over the same space on its own seeds, to check whether a single F-Race over one sample had missed a better region.
 
@@ -162,7 +162,7 @@ All 12 settings survived all 30 instances; the Friedman test never rejected (p �
 
 ## 6. Final parameters
 
-The values below are now the defaults in `src/aco_router/config.py` and are saved in `outputs/tuning/tuned_params.json`. The untuned values are kept in `tuning.space.UNTUNED_PARAMS` and `outputs/tuning/defaults_params.json`, so the untuned comparison can still be run. The shared values are candidate 19's, rounded to two or three significant figures; the confirmation ran the unrounded values.
+The values below are now the defaults in `src/aco_router/config.py` and are saved in `outputs/tuning/tuned_params.json`. The untuned values are kept in `tuning.tuner.UNTUNED_PARAMS` and `outputs/tuning/defaults_params.json`, so the untuned comparison can still be run. The shared values are candidate 19's, rounded to two or three significant figures; the confirmation ran the unrounded values.
 
 | Parameter | Before | Tuned |
 |---|---|---|
@@ -189,15 +189,15 @@ The values below are now the defaults in `src/aco_router/config.py` and are save
 python scripts/tune_aco.py budget --camp --instances 20 --workers 8 --out outputs/tuning/budget
 python scripts/tune_aco.py shared --camp --ants 20 --iterations 60 --instances 30 --workers 9 --out outputs/tuning/shared
 python scripts/tune_aco.py irace --camp --ants 20 --iterations 60 --instances 30 --budget 1000 --workers 9 --out outputs/tuning/irace
-python scripts/confirm_tuning.py defaults=defaults frace11=outputs/tuning/shared_candidate11.json \
+python scripts/tune_aco.py confirm defaults=defaults frace11=outputs/tuning/shared_candidate11.json \
     frace19=outputs/tuning/shared_candidate19.json irace51=outputs/tuning/irace_elite51.json \
     irace108=outputs/tuning/irace_elite108.json irace61=outputs/tuning/irace_elite61.json \
-    irace41=outputs/tuning/irace_elite41.json --camp --workers 9 --out outputs/tuning/confirm.csv
+    irace41=outputs/tuning/irace_elite41.json --camp --workers 9 --out outputs/tuning/confirm
 python scripts/tune_aco.py fast-evaporation --params outputs/tuning/chosen_shared.json --camp --ants 20 \
     --iterations 60 --instances 30 --workers 9 --out outputs/tuning/fast_evaporation
 ```
 
-On a 10-core machine each step took between 1 and 15 minutes (the iterated race was the longest). Without `--params`, the tuning scripts start from the untuned parameters, so they give the same results after `config.py` was updated.
+On a 10-core machine each step took between 1 and 15 minutes (the iterated race was the longest). Without `--params`, the tuning steps start from the untuned parameters, so they give the same results after `config.py` was updated.
 
 Output files, per race: `<out>_candidates.csv` (each candidate's parameters, when it was dropped, and whether it survived), `<out>_log.csv` (one row per instance: candidates alive, test used, p-value, candidates dropped), `<out>_results.csv` (every plan's scores) and `<out>_params.json` / `<out>_candidate<N>.json` (the pick and the survivors). The iterated race writes `_iterations.csv` and `_elite<N>.json` instead of `_log.csv` and `_candidate<N>.json`. The confirmation writes the raw results, `_summary.csv` (paired comparisons overall and per strategy) and `_means.csv`.
 
