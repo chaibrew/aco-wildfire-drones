@@ -1,6 +1,6 @@
 # ACO parameter tuning
 
-This document describes how the ACO router's parameters were tuned, the results of each step, and the setting that was chosen. The code is in `src/tuning`, `scripts/tune_aco.py` and `scripts/confirm_tuning.py`. The raw results are written to `outputs/tuning/` (not in git; the commands at the end regenerate them, and every step is deterministic, so a rerun gives the same numbers).
+This document describes how the ACO router's parameters were tuned, the results of each step, and the setting that was chosen. The code is in `src/tuning/racing.py` (F-Race and the iterated race, independent of the ACO), `src/tuning/tuner.py` (the parameter space, tuning instances, scoring and result tables) and `scripts/tune_aco.py` (one subcommand per step). The raw results are written to `outputs/tuning/` (not in git; the commands at the end regenerate them, and every step is deterministic, so a rerun gives the same numbers).
 
 ## 1. Aims
 
@@ -59,7 +59,7 @@ The three measures are defined from P_i, the longest gap between observations of
 
 **F-Race** (Birattari et al., 2002) evaluates all candidate settings on one instance at a time. From the fifth instance on (`first_test` = 5), after each new instance a Friedman test checks whether the candidates' mean ranks differ by more than chance would explain. The Friedman test is a non-parametric test for several methods measured on the same set of problems. If it rejects at α = 0.05, a Conover post-hoc test drops every candidate whose rank sum is worse than the best rank sum by more than a critical difference. When only two candidates remain, a Wilcoxon signed-rank test is used instead. These are the statistics used by irace (López-Ibáñez et al., 2016). After a candidate is dropped, the earlier blocks are re-ranked without it. The race stops when one candidate is left or the instances run out; the survivor with the best mean rank is the race's pick.
 
-**Iterated race.** irace repeats the race. After each race it keeps the best survivors ("elites"), samples new candidates near them, and narrows the sampling spread, so later races search a smaller region around the settings that did well. The irace package runs in R, so a small Python version was written (`src/tuning/irace.py`). It follows irace's default rules: 2 + ⌊log₂ 6⌋ = 4 iterations for 6 parameters; the remaining budget is split evenly over the remaining iterations; up to 4 elites are kept; a new candidate takes an elite as its parent with probability proportional to its rank, and each parameter is drawn from a normal distribution around the parent's value (on a 0–1 scale, log scale for ρ, τ_min ratio and ε), with a standard deviation that starts at 0.5 and shrinks each iteration. It differs from irace in three ways: every race uses the same 30 instances in the same order (results already computed for a candidate on an instance are reused); elites can be dropped like any other candidate (irace protects them until new instances have been seen); and only numerical parameters are sampled. It was run with a budget of 1,000 (candidate, instance) evaluations, the same order of cost as the F-Race.
+**Iterated race.** irace repeats the race. After each race it keeps the best survivors ("elites"), samples new candidates near them, and narrows the sampling spread, so later races search a smaller region around the settings that did well. The irace package runs in R, so a small Python version was written (`IteratedRace` in `src/tuning/racing.py`). It follows irace's default rules: 2 + ⌊log₂ 6⌋ = 4 iterations for 6 parameters; the remaining budget is split evenly over the remaining iterations; up to 4 elites are kept; a new candidate takes an elite as its parent with probability proportional to its rank, and each parameter is drawn from a normal distribution around the parent's value (on a 0–1 scale, log scale for ρ, τ_min ratio and ε), with a standard deviation that starts at 0.5 and shrinks each iteration. It differs from irace in three ways: every race uses the same 30 instances in the same order (results already computed for a candidate on an instance are reused); elites can be dropped like any other candidate (irace protects them until new instances have been seen); and only numerical parameters are sampled. It was run with a budget of 1,000 (candidate, instance) evaluations, the same order of cost as the F-Race.
 
 The iterated race was run as a second, independent search over the same space on its own seeds, to check whether a single F-Race over one sample had missed a better region.
 
@@ -152,17 +152,30 @@ Every tuned setting reduced total overdue (by 3.4 to 4.7) and the overdue count 
 
 The settings with low ρ (0.02–0.11) help the three strategies that keep some pheromone more than they help full reset, by 1.4 to 2.6. The settings with higher ρ (0.22 and 0.36) help all four strategies about equally (a spread of 0.4–0.6). An interpretation, not tested directly: with low ρ, pheromone from earlier stages lasts for many iterations, so the strategies that keep it gain more from good pheromone; with high ρ, old pheromone fades within a few iterations whatever the strategy does.
 
-**Choice: F-Race candidate 19.** The rule set before the confirmation was to prefer a setting that is better than the defaults on fresh data and improves all four strategies about equally, so that tuning does not bias the strategy comparison. Candidates 19 and irace 41 both meet it and are nearly identical in every measure. Candidate 19 was kept because it has the lower total overdue and overdue count of the two and because it was the setting chosen in the first tuning run. irace 51 and 108 have the largest overall gains but favour the pheromone-keeping strategies over full reset, so choosing them would build part of the research question's answer into the parameters.
+**Choice: F-Race candidate 19, with ρ kept at 0.1.** The rule set before the confirmation was to prefer a setting that is better than the defaults on fresh data and improves all four strategies about equally. Candidates 19 and irace 41 both meet it. Candidate 19 was taken because it has the lower total overdue and overdue count of the two. Its ρ was not used: ρ was kept at the old default 0.1, for the reason in Section 5.6. The table above shows why ρ needs care: it is the parameter that decides how much the strategies differ, so it is part of the research question and should not be tuned with it.
 
 ### 5.5 Fast-evaporation race
 
-With the shared parameters fixed at candidate 19 (ρ = 0.36), the candidates were ρ_high ∈ {0.5, 0.7, 0.9} × k ∈ {2, 5, 10, 20}, 12 settings in all, with the current values (ρ_high = 0.5, k = 10) as candidate 0. The grid values 0.2 and 0.3 were left out because they are below ρ, so they would make the strategy evaporate more slowly after a change, not faster. Only the fast-evaporation strategy was scored.
+With the shared parameters fixed at candidate 19 (this race was run with candidate 19's raced values), the candidates were ρ_high ∈ {0.5, 0.7, 0.9} × k ∈ {2, 5, 10, 20}, 12 settings in all, with the current values (ρ_high = 0.5, k = 10) as candidate 0. The grid values 0.2 and 0.3 were left out because they are below ρ, so they would make the strategy evaporate more slowly after a change, not faster. Only the fast-evaporation strategy was scored.
 
 All 12 settings survived all 30 instances; the Friedman test never rejected (p ≥ 0.07 at every test). There is therefore no evidence that any setting is better than another, and **ρ_high = 0.5 and k = 10 were kept**.
 
+### 5.6 Why ρ was kept at 0.1
+
+ρ decides how much old pheromone survives from one iteration to the next. The four strategies differ only in how much old pheromone they keep after a change, so ρ is part of the research question rather than a setting to tune. The races also could not separate the ρ values they tried (Section 5.3). ρ was therefore kept at the old default 0.1, and only the other shared parameters were taken from candidate 19.
+
+With candidate 19's other values and ρ = 0.1, the 24 h Camp Fire replay (10 drones, 10 seeds, 20 × 60) gave:
+
+| Setting (10 drones) | Full reset | Retention | Fast evaporation | Selective reset |
+|---|---|---|---|---|
+| Old defaults | 45.62 | −1.93 (9/10, p = 0.004) | −1.29 (10/10, p = 0.002) | −1.20 (9/10, p = 0.010) |
+| Tuned (ρ = 0.1) | 40.27 | −1.60 (9/10, p = 0.004) | −0.66 (8/10, p = 0.049) | −1.17 (9/10, p = 0.006) |
+
+Values are full reset's mean, then each strategy minus full reset (seeds better than full reset, Wilcoxon signed-rank p). Tuning lowered overdue points for every strategy, and the strategies that keep pheromone stayed ahead of full reset. Retention with the tuned values (38.67) was the lowest result.
+
 ## 6. Final parameters
 
-The values below are now the defaults in `src/aco_router/config.py` and are saved in `outputs/tuning/tuned_params.json`. The untuned values are kept in `tuning.space.UNTUNED_PARAMS` and `outputs/tuning/defaults_params.json`, so the untuned comparison can still be run. The shared values are candidate 19's, rounded to two or three significant figures; the confirmation ran the unrounded values.
+The values below are now the defaults in `src/aco_router/config.py` and are saved in `outputs/tuning/tuned_params.json`. The untuned values are kept in `tuning.tuner.UNTUNED_PARAMS` and `outputs/tuning/defaults_params.json`, so the untuned comparison can still be run. The shared values are candidate 19's, rounded to two or three significant figures, except ρ, which stays at 0.1 (Section 5.6); the confirmation ran candidate 19's unrounded raced values.
 
 | Parameter | Before | Tuned |
 |---|---|---|
@@ -170,18 +183,18 @@ The values below are now the defaults in `src/aco_router/config.py` and are save
 | α | 1.0 | 0.73 |
 | β | 1.0 | 2.49 |
 | λ | 2.0 | 1.93 |
-| ρ | 0.1 | 0.36 |
+| ρ | 0.1 | 0.1 (kept; Section 5.6) |
 | τ_min ratio | 0.01 | 0.024 |
 | ε | 0.05 | 0.12 |
 | ρ_high, k | 0.5, 10 | 0.5, 10 (unchanged) |
 
-`scripts/aco_experiment.py`, `scripts/run_change_experiment.py` and `ExperimentConfig` now default to 20 ants × 60 iterations, and both scripts accept `--params FILE.json` to run any other setting (for example the untuned one). All 146 tests pass with the tuned defaults, including the brute-force optimality test.
+`scripts/aco_experiment.py`, `scripts/run_change_experiment.py` and `ExperimentConfig` now default to 20 ants × 60 iterations, and both scripts accept `--params FILE.json` to run any other setting (for example the untuned one). All 147 tests pass with the tuned defaults, including the brute-force optimality test.
 
 ## 7. Findings to report
 
 - **β changed from 1 to about 2.5.** The value β = 1 was chosen on 4-point test problems. On full-size fires, preferring nearby points gives better plans. Both independent searches put β between 2.5 and 3.0. The progress report's statement that β = 1 was chosen deliberately should be updated.
 - **The tuned setting is better on overdue measures and slightly worse on margin.** On fresh instances, total overdue fell by 3.9 (better in 70 of 80 cases) and the overdue count by 3.3 (better in 70 of 80), while the margin was equal in 63 cases and worse in 17, by about 0.6% on average.
-- **ρ is not determined by the race, but it changes how much the strategies differ.** Settings from ρ = 0.02 to ρ = 0.36 were statistically tied in both searches, yet low-ρ settings favour the pheromone-keeping strategies over full reset in the confirmation. The chosen ρ = 0.36 treats the strategies equally, which keeps the comparison fair, but it also means old pheromone fades quickly. The strategy experiments should be read with this in mind, and it may be worth repeating the main strategy comparison at a low ρ as a sensitivity check.
+- **ρ was kept at 0.1.** ρ decides how much old pheromone survives, which is what the four strategies are compared on, so it is part of the research question. The races also could not separate the ρ values they tried. With ρ = 0.1 and the other tuned values, retention, fast evaporation and selective reset stayed ahead of full reset in the Camp Fire replay (Section 5.6).
 
 ## 8. Reproducing
 
@@ -189,15 +202,15 @@ The values below are now the defaults in `src/aco_router/config.py` and are save
 python scripts/tune_aco.py budget --camp --instances 20 --workers 8 --out outputs/tuning/budget
 python scripts/tune_aco.py shared --camp --ants 20 --iterations 60 --instances 30 --workers 9 --out outputs/tuning/shared
 python scripts/tune_aco.py irace --camp --ants 20 --iterations 60 --instances 30 --budget 1000 --workers 9 --out outputs/tuning/irace
-python scripts/confirm_tuning.py defaults=defaults frace11=outputs/tuning/shared_candidate11.json \
+python scripts/tune_aco.py confirm defaults=defaults frace11=outputs/tuning/shared_candidate11.json \
     frace19=outputs/tuning/shared_candidate19.json irace51=outputs/tuning/irace_elite51.json \
     irace108=outputs/tuning/irace_elite108.json irace61=outputs/tuning/irace_elite61.json \
-    irace41=outputs/tuning/irace_elite41.json --camp --workers 9 --out outputs/tuning/confirm.csv
+    irace41=outputs/tuning/irace_elite41.json --camp --workers 9 --out outputs/tuning/confirm
 python scripts/tune_aco.py fast-evaporation --params outputs/tuning/chosen_shared.json --camp --ants 20 \
     --iterations 60 --instances 30 --workers 9 --out outputs/tuning/fast_evaporation
 ```
 
-On a 10-core machine each step took between 1 and 15 minutes (the iterated race was the longest). Without `--params`, the tuning scripts start from the untuned parameters, so they give the same results after `config.py` was updated.
+On a 10-core machine each step took between 1 and 15 minutes (the iterated race was the longest). Without `--params`, the tuning steps start from the untuned parameters, so they give the same results after `config.py` was updated.
 
 Output files, per race: `<out>_candidates.csv` (each candidate's parameters, when it was dropped, and whether it survived), `<out>_log.csv` (one row per instance: candidates alive, test used, p-value, candidates dropped), `<out>_results.csv` (every plan's scores) and `<out>_params.json` / `<out>_candidate<N>.json` (the pick and the survivors). The iterated race writes `_iterations.csv` and `_elite<N>.json` instead of `_log.csv` and `_candidate<N>.json`. The confirmation writes the raw results, `_summary.csv` (paired comparisons overall and per strategy) and `_means.csv`.
 

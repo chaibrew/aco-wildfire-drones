@@ -63,7 +63,7 @@ def parse_args():
 def _load_params(path):
     if not path:
         return None
-    from tuning.space import load_params
+    from tuning import load_params
     return load_params(path)
 
 

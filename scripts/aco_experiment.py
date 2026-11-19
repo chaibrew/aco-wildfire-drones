@@ -77,7 +77,7 @@ def main():
     args = parse_args()
     base = ACOParams()
     if args.params:
-        from tuning.space import load_params
+        from tuning import load_params
         base = load_params(args.params)
     params = base.with_(n_ants=args.ants, max_iterations=args.iterations, change_trigger=args.trigger,
                         selective_radius_m=args.selective_radius)

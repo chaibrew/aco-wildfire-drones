@@ -45,11 +45,11 @@ HORIZON_TOLERANCE_S: float = 1e-9
 
 @dataclass(frozen=True)
 class ACOParams:
-    # Tuned defaults (docs/tuning.md); pre-tuning values are in tuning.space.UNTUNED_PARAMS.
+    # Tuned defaults (docs/tuning.md); pre-tuning values are in tuning.tuner.UNTUNED_PARAMS.
     n_ants: int = 20
     alpha: float = 0.73
     beta: float = 2.49
-    rho: float = 0.36
+    rho: float = 0.1  # kept at the old default; see docs/tuning.md section 5.6
     deposit_q: float = 1.0
     tau0_mode: Tau0Mode = Tau0Mode.NEAREST_NEIGHBOUR
     tau0_constant: float = 1.0
