@@ -1,3 +1,4 @@
+import argparse
 import csv
 import os
 import pickle
@@ -12,11 +13,11 @@ from fire_sim.fire import load_fire  # noqa: E402
 from fire_sim.mission import MissionConfig, run_mission  # noqa: E402
 
 from aco_router import ACOParams, ACORouter, FireSimRouter, StrategyName, summary  # noqa: E402
+from baselines import GreedyRouter, VNSParams, VNSRouter  # noqa: E402
 from tuning import UNTUNED_PARAMS  # noqa: E402
 
-OUT = sys.argv[1]
-SEEDS = range(int(sys.argv[2]) if len(sys.argv) > 2 else 10)
-DRONES = (6, 12)
+ANTS, ITERATIONS = 20, 60
+OUT = ""
 SETTINGS = {"untuned": UNTUNED_PARAMS, "tuned": ACOParams()}
 GPKG, CACHE = "data/raw/LargeFires_2018.gpkg", "data/cache"
 
@@ -39,9 +40,15 @@ class Recorder:
 def job(args):
     setting, strategy, seed, drones = args
     path = f"{OUT}/stages/{setting}_{strategy}_s{seed}_d{drones}.pkl"
-    params = SETTINGS[setting].with_(n_ants=20, max_iterations=60)
     field, _ = load_fire(GPKG, fire_id=3885, year=2018, limit=8, seed=seed, cache_dir=CACHE)
-    rec = Recorder(FireSimRouter(ACORouter(params, strategy=StrategyName(strategy), seed=seed)))
+    if setting == "baseline":
+        params = None
+        # VNS gets the same number of plan evaluations as ACO (ants * iterations) per replan
+        router = GreedyRouter() if strategy == "greedy" else VNSRouter(VNSParams(max_evaluations=ANTS * ITERATIONS), seed=seed)
+    else:
+        params = SETTINGS[setting].with_(n_ants=ANTS, max_iterations=ITERATIONS)
+        router = FireSimRouter(ACORouter(params, strategy=StrategyName(strategy), seed=seed))
+    rec = Recorder(router)
     started = time.time()
     rows, _ = run_mission(field, rec, MissionConfig(cell_size_m=1000.0, drones=drones, horizon_s=600),
                           stop_s=field.start_s + 24 * 3600)
@@ -57,15 +64,33 @@ def job(args):
             "true_overdue_total": sum(r["true_overdue_count"] for r in rows), "wall_s": wall}
 
 
+def parse_args():
+    p = argparse.ArgumentParser(description="24 h Camp Fire missions: untuned vs tuned ACO, optionally with baselines.")
+    p.add_argument("out", help="output directory (missions.csv and per-stage recordings)")
+    p.add_argument("--seeds", type=int, default=10)
+    p.add_argument("--drones", type=int, nargs="+", default=[6, 12])
+    p.add_argument("--baselines", action="store_true", help="also run greedy and VNS")
+    return p.parse_args()
+
+
+def init(out):
+    global OUT
+    OUT = out
+
+
 if __name__ == "__main__":
+    args = parse_args()
+    OUT = args.out
     os.makedirs(f"{OUT}/stages", exist_ok=True)
-    jobs = [(st, sg.value, seed, d) for d in DRONES for seed in SEEDS for sg in StrategyName for st in SETTINGS]
+    jobs = [(st, sg.value, seed, d) for d in args.drones for seed in range(args.seeds) for sg in StrategyName for st in SETTINGS]
+    if args.baselines:
+        jobs += [("baseline", b, seed, d) for d in args.drones for seed in range(args.seeds) for b in ("greedy", "vns")]
     results = []
     t0 = time.time()
-    with Pool(int(os.environ.get("WORKERS", 9))) as pool:
+    with Pool(int(os.environ.get("WORKERS", 9)), initializer=init, initargs=(OUT,)) as pool:
         for i, r in enumerate(pool.imap_unordered(job, jobs), 1):
             results.append(r)
-            print(f"[{i}/{len(jobs)} {time.time() - t0:5.0f}s] {r['setting']:7s} {r['strategy']:16s} seed {r['seed']} "
+            print(f"[{i}/{len(jobs)} {time.time() - t0:5.0f}s] {r['setting']:8s} {r['strategy']:16s} seed {r['seed']} "
                   f"d{r['drones']:2d} true overdue {r['true_overdue_mean']:.2f}", flush=True)
             with open(f"{OUT}/missions.csv", "w", newline="") as fh:
                 w = csv.DictWriter(fh, fieldnames=list(results[0]))
