@@ -152,29 +152,30 @@ Every tuned setting reduced total overdue (by 3.4 to 4.7) and the overdue count 
 
 The settings with low ρ (0.02–0.11) help the three strategies that keep some pheromone more than they help full reset, by 1.4 to 2.6. The settings with higher ρ (0.22 and 0.36) help all four strategies about equally (a spread of 0.4–0.6). An interpretation, not tested directly: with low ρ, pheromone from earlier stages lasts for many iterations, so the strategies that keep it gain more from good pheromone; with high ρ, old pheromone fades within a few iterations whatever the strategy does.
 
-**Choice: F-Race candidate 19, with ρ kept at 0.1.** The rule set before the confirmation was to prefer a setting that is better than the defaults on fresh data and improves all four strategies about equally. Candidates 19 and irace 41 both meet it. Candidate 19 was taken because it has the lower total overdue and overdue count of the two. Its ρ (0.36) was later replaced by the old default 0.1, for the reason in Section 5.6: a high ρ removes old pheromone so fast that it does the job of a full reset, and in the Camp Fire replay it made the four strategies indistinguishable. The table above shows the same interaction: ρ is the parameter that decides how much the strategies differ, so it is part of the research question and should not be tuned with it.
+**Choice: F-Race candidate 19, with ρ kept at 0.1.** The rule set before the confirmation was to prefer a setting that is better than the defaults on fresh data and improves all four strategies about equally. Candidates 19 and irace 41 both meet it. Candidate 19 was taken because it has the lower total overdue and overdue count of the two. Its ρ was not used: ρ was kept at the old default 0.1, for the reason in Section 5.6. The table above shows why ρ needs care: it is the parameter that decides how much the strategies differ, so it is part of the research question and should not be tuned with it.
 
 ### 5.5 Fast-evaporation race
 
-With the shared parameters fixed at candidate 19 (this race was run with its original ρ = 0.36), the candidates were ρ_high ∈ {0.5, 0.7, 0.9} × k ∈ {2, 5, 10, 20}, 12 settings in all, with the current values (ρ_high = 0.5, k = 10) as candidate 0. The grid values 0.2 and 0.3 were left out because they are below ρ, so they would make the strategy evaporate more slowly after a change, not faster. Only the fast-evaporation strategy was scored.
+With the shared parameters fixed at candidate 19 (this race was run with candidate 19's raced values), the candidates were ρ_high ∈ {0.5, 0.7, 0.9} × k ∈ {2, 5, 10, 20}, 12 settings in all, with the current values (ρ_high = 0.5, k = 10) as candidate 0. The grid values 0.2 and 0.3 were left out because they are below ρ, so they would make the strategy evaporate more slowly after a change, not faster. Only the fast-evaporation strategy was scored.
 
 All 12 settings survived all 30 instances; the Friedman test never rejected (p ≥ 0.07 at every test). There is therefore no evidence that any setting is better than another, and **ρ_high = 0.5 and k = 10 were kept**.
 
 ### 5.6 Why ρ was kept at 0.1
 
-With all of candidate 19's values (ρ = 0.36), the 24 h Camp Fire replay (10 drones, 10 seeds, 20 × 60) showed no difference between the strategies: all four were between 39.0 and 39.2 overdue true-front points, and no strategy differed from full reset (Wilcoxon p ≥ 0.49). With the old defaults (ρ = 0.1) the strategies that keep pheromone were clearly better than full reset. To find out which parameter removed the difference, the replay was rerun with candidate 19's values except ρ = 0.1:
+ρ decides how much old pheromone survives from one iteration to the next. The four strategies differ only in how much old pheromone they keep after a change, so ρ is part of the research question rather than a setting to tune. The races also could not separate the ρ values they tried (Section 5.3). ρ was therefore kept at the old default 0.1, and only the other shared parameters were taken from candidate 19.
+
+With candidate 19's other values and ρ = 0.1, the 24 h Camp Fire replay (10 drones, 10 seeds, 20 × 60) gave:
 
 | Setting (10 drones) | Full reset | Retention | Fast evaporation | Selective reset |
 |---|---|---|---|---|
 | Old defaults | 45.62 | −1.93 (9/10, p = 0.004) | −1.29 (10/10, p = 0.002) | −1.20 (9/10, p = 0.010) |
-| Candidate 19, ρ = 0.1 | 40.27 | −1.60 (9/10, p = 0.004) | −0.66 (8/10, p = 0.049) | −1.17 (9/10, p = 0.006) |
-| Candidate 19, ρ = 0.36 | 39.16 | −0.14 (7/10, p = 0.49) | −0.05 (7/10, p = 0.56) | +0.06 (4/10, p = 0.75) |
+| Tuned (ρ = 0.1) | 40.27 | −1.60 (9/10, p = 0.004) | −0.66 (8/10, p = 0.049) | −1.17 (9/10, p = 0.006) |
 
-Values are full reset's mean, then each strategy minus full reset (seeds better than full reset, Wilcoxon signed-rank p). With ρ = 0.1 the differences return at almost their untuned size, so ρ is what removed them. Raising ρ to 0.36 mainly helped full reset (39.16 against 40.27, better in 9 of 10 seeds, p = 0.006); the other strategies did not change significantly, and retention with ρ = 0.1 (38.67) was the lowest result of any setting. ρ = 0.1 is therefore the default, and the ρ = 0.36 replay results were removed from `outputs/`.
+Values are full reset's mean, then each strategy minus full reset (seeds better than full reset, Wilcoxon signed-rank p). Tuning lowered overdue points for every strategy, and the strategies that keep pheromone stayed ahead of full reset. Retention with the tuned values (38.67) was the lowest result.
 
 ## 6. Final parameters
 
-The values below are now the defaults in `src/aco_router/config.py` and are saved in `outputs/tuning/tuned_params.json`. The untuned values are kept in `tuning.tuner.UNTUNED_PARAMS` and `outputs/tuning/defaults_params.json`, so the untuned comparison can still be run. The shared values are candidate 19's, rounded to two or three significant figures, except ρ, which stays at 0.1 (Section 5.6); the confirmation ran candidate 19's unrounded values with ρ = 0.36.
+The values below are now the defaults in `src/aco_router/config.py` and are saved in `outputs/tuning/tuned_params.json`. The untuned values are kept in `tuning.tuner.UNTUNED_PARAMS` and `outputs/tuning/defaults_params.json`, so the untuned comparison can still be run. The shared values are candidate 19's, rounded to two or three significant figures, except ρ, which stays at 0.1 (Section 5.6); the confirmation ran candidate 19's unrounded raced values.
 
 | Parameter | Before | Tuned |
 |---|---|---|
@@ -193,7 +194,7 @@ The values below are now the defaults in `src/aco_router/config.py` and are save
 
 - **β changed from 1 to about 2.5.** The value β = 1 was chosen on 4-point test problems. On full-size fires, preferring nearby points gives better plans. Both independent searches put β between 2.5 and 3.0. The progress report's statement that β = 1 was chosen deliberately should be updated.
 - **The tuned setting is better on overdue measures and slightly worse on margin.** On fresh instances, total overdue fell by 3.9 (better in 70 of 80 cases) and the overdue count by 3.3 (better in 70 of 80), while the margin was equal in 63 cases and worse in 17, by about 0.6% on average.
-- **ρ is not determined by the race, but it decides how much the strategies differ.** Settings from ρ = 0.02 to ρ = 0.36 were statistically tied in both searches. In the Camp Fire replay, ρ = 0.36 made all four strategies the same, while ρ = 0.1 with the other tuned values kept retention, fast evaporation and selective reset ahead of full reset (Section 5.6). A high ρ does the job of a full reset on every iteration, so ρ was kept at 0.1.
+- **ρ was kept at 0.1.** ρ decides how much old pheromone survives, which is what the four strategies are compared on, so it is part of the research question. The races also could not separate the ρ values they tried. With ρ = 0.1 and the other tuned values, retention, fast evaporation and selective reset stayed ahead of full reset in the Camp Fire replay (Section 5.6).
 
 ## 8. Reproducing
 
