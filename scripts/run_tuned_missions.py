@@ -68,7 +68,7 @@ def parse_args():
     p = argparse.ArgumentParser(description="24 h Camp Fire missions: untuned vs tuned ACO, optionally with baselines.")
     p.add_argument("out", help="output directory (missions.csv and per-stage recordings)")
     p.add_argument("--seeds", type=int, default=10)
-    p.add_argument("--drones", type=int, nargs="+", default=[6, 12])
+    p.add_argument("--drones", type=int, nargs="+", default=[10])
     p.add_argument("--baselines", action="store_true", help="also run greedy and VNS")
     return p.parse_args()
 
