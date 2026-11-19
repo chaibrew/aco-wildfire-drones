@@ -40,6 +40,11 @@ for drones in sorted({k[0] for k in runs}):
                                   f"aco_{s}_untuned", f"aco_{s}_tuned"))
         summary.append(paired(drones, [(f"aco_{s}_untuned", f"aco_{s}_tuned") for s in strategies], m,
                               "tuned_vs_untuned", "aco_untuned_all", "aco_tuned_all"))
+        for setting in ("tuned", "untuned"):
+            for s in strategies:
+                if s != "full_reset":
+                    summary.append(paired(drones, [(f"aco_full_reset_{setting}", f"aco_{s}_{setting}")], m,
+                                          f"{setting}_vs_full_reset", f"aco_full_reset_{setting}", f"aco_{s}_{setting}"))
         for b in baselines:
             for setting in ("tuned", "untuned"):
                 for s in strategies:
