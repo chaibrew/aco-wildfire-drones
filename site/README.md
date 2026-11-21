@@ -8,7 +8,6 @@ Drones are drawn with the 8-frame pixel-art quadcopter sprite in `public/sprites
 
 - **Mission replay** (`/`). The recorded 24 h Camp Fire missions, animated. Pick 6, 10 or 12 drones and any two planners: the four ACO pheromone strategies, plus greedy and VNS at 10 drones. Play, pause (space bar), change speed (2 min/s to 2 h/s) and scrub through time. Monitoring points stay grey until they are due soon, overdue or missed. The ACO maps draw the strongest pheromone links each strategy keeps when the map changes; these are recorded by `scripts/site/record_pheromone.py`, which re-runs the seed-0 missions (the export checks the routes match the original recordings).
 - **Change size** (`/explore`). The controlled-change experiment. A slider sets the share of points changed (5–60%), and toggles set the locality and the fire state. The map shows the points, the changed and removed points, the pheromone right after the change and after replanning, and each planner's routes.
-- **Conclusion** (`/conclusion`). Each claim from the conclusion, with numbers computed in the browser from the same data, and links that open the view that shows it.
 
 ## Develop
 

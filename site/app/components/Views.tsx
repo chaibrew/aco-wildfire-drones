@@ -8,4 +8,3 @@ const loading = () => <div className="w-full h-[560px] bg-gray-alpha-100 animate
 
 export const ReplayContainer = dynamic(() => import("./ReplayView"), { ssr: false, loading });
 export const ExploreContainer = dynamic(() => import("./ExploreView"), { ssr: false, loading });
-export const ConclusionContainer = dynamic(() => import("./ConclusionView"), { ssr: false, loading });
