@@ -41,6 +41,13 @@ diagnostic() {
         --planners aco_retention aco_full_reset aco_selective_reset --out "$OUT/camp_untuned_cycle.csv" > /dev/null
 }
 
+# Same design as diagnostic, but with the final tuned parameters (ACOParams defaults: rho = 0.1, 20 x 60).
+tuned() {
+    "$PY" scripts/run_change_experiment.py --drones 10 --direction cycle --kind mixed --workers "$W" "${CAMP[@]}" \
+        --trials 10 --first-seed 5000 --ants 20 --iterations 60 \
+        --planners aco_retention aco_full_reset aco_selective_reset --out "$OUT/camp_tuned_rho01_cycle.csv" > /dev/null
+}
+
 figures() {
     mkdir -p docs/figures
     for v in margin total_overdue; do
@@ -65,6 +72,7 @@ pilot)
 final) final "${2:?radius in metres, from the pilot}" ;;
 budget) budget ;;
 diagnostic) diagnostic ;;
+tuned) tuned ;;
 figures) figures ;;
 all)
     final "${2:?radius in metres, from the pilot}"
@@ -73,7 +81,7 @@ all)
     figures
     ;;
 *)
-    echo "usage: $0 pilot | final RADIUS_M | budget | diagnostic | figures | all RADIUS_M" >&2
+    echo "usage: $0 pilot | final RADIUS_M | budget | diagnostic | tuned | figures | all RADIUS_M" >&2
     exit 2
     ;;
 esac
