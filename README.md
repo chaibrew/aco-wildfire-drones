@@ -2,7 +2,7 @@
 
 ACO routing for wildfire-monitoring drones (COMP3821). This project compares different pheromone strategies when the fire perimeter changes.
 
-See it in action!: [aco-wildfire-drones.vercel.app](https://aco-wildfire-drones.vercel.app)
+See it in action! (recommend viewing on desktop): [aco-wildfire-drones.vercel.app](https://aco-wildfire-drones.vercel.app)
 
 ## Setup
 
