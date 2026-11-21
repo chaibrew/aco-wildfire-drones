@@ -47,7 +47,7 @@ function PheromoneLayer({ run, k, mode, color, proj }: { run: Run; k: number; mo
       {edges.map(([p, q, r], i) => {
         const f = top > 0 ? Math.log(r) / top : 1;
         const [x1, y1] = proj.p(p), [x2, y2] = proj.p(q);
-        return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke={color} strokeWidth={1 + 4 * f} strokeOpacity={0.12 + 0.5 * f} strokeLinecap="round" />;
+        return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke={color} strokeWidth={2.5 + 5 * f} strokeOpacity={0.35 + 0.55 * f} strokeLinecap="round" />;
       })}
     </g>
   );
@@ -202,9 +202,12 @@ export default function ReplayView() {
         className={hidden ? "hidden md:block" : ""}
         tip={which === "a" ? tipA : tipB}
         caption={<span className="flex items-center gap-1.5"><span style={{ color: SIDE_COLOR[which] }}>▲</span>{which.toUpperCase()} · {plannerLabel(key)}</span>}
-        overlay={flash && (
-          <div className="pointer-events-none absolute top-10 left-1/2 z-10 -translate-x-1/2 bg-gray-1000 text-background-100 px-3 py-1.5 font-mono text-xs uppercase whitespace-nowrap">{flash}</div>
-        )}
+        overlay={<>
+          {flash && <div className="pointer-events-none absolute top-10 left-1/2 z-10 -translate-x-1/2 bg-gray-1000 text-background-100 px-3 py-1.5 font-mono text-xs uppercase whitespace-nowrap">{flash}</div>}
+          {ph === "on" && noPheromone(key) && (
+            <div className="pointer-events-none absolute bottom-10 left-2 max-w-[80%] bg-[var(--ds-background-100)]/85 px-1.5 py-1 font-mono text-[11px] uppercase text-gray-900">{noPheromone(key)}</div>
+          )}
+        </>}
       >
         {(proj) => run && <MissionLayer index={index} run={run} fire={runs!.fire} color={SIDE_COLOR[which]} clock={clock} proj={proj} ph={ph} onTip={which === "a" ? setTipA : setTipB} />}
       </FireMap>
@@ -279,7 +282,7 @@ export default function ReplayView() {
       <ul aria-label="Map legend" className="list-none pl-0 flex flex-wrap gap-x-5 gap-y-2 pb-6">
         {STALE_BINS.map((s) => <LegendItem key={s.label} mark={<Sq color={s.color} />}>{s.label}</LegendItem>)}
         <LegendItem mark={<DroneIcon ring={SIDE_COLOR.a} />}>drone</LegendItem>
-        {ph !== "off" && <LegendItem mark={<Ln color={SIDE_COLOR.a} w={4} />}>pheromone kept from last plan (wider = stronger)</LegendItem>}
+        {ph !== "off" && <LegendItem mark={<span className="inline-flex flex-col gap-0.5"><Ln color={SIDE_COLOR.a} w={3} />{compare && <Ln color={SIDE_COLOR.b} w={3} />}</span>}>pheromone kept from last plan (wider = stronger)</LegendItem>}
         <LegendItem mark={<Ln color="var(--ds-gray-1000)" w={3} />}>satellite perimeter (FEDS)</LegendItem>
         <LegendItem mark={<Ln color="var(--fire)" w={3} />}>modelled fire front</LegendItem>
       </ul>
@@ -344,6 +347,13 @@ export default function ReplayView() {
       </section>
     </div>
   );
+}
+
+/** Why a map shows no pheromone, or null when it should show some. */
+function noPheromone(key: string) {
+  if (PLANNER[key]) return `No pheromone: ${PLANNER[key].short} does not use it`;
+  if (strategyOf(key) === "full_reset") return "No pheromone kept: full reset clears it at every change";
+  return null;
 }
 
 function phCount(run: Run, k: number, mode: PhMode) {
