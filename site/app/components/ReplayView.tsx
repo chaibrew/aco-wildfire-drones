@@ -333,7 +333,7 @@ export default function ReplayView() {
           title="Pheromone kept"
           value={runs ? phCount(runs.a, stageAt(runs.a, t), ph) : "–"}
           infoContent={<>
-            <p>Each ant colony keeps a pheromone value for every pair of points. Good routes deposit pheromone, every iteration evaporates 36% of it, and values are kept between a floor and a ceiling (MAX-MIN ant system).</p>
+            <p>Each ant colony keeps a pheromone value for every pair of points. Good routes deposit pheromone, every iteration evaporates 10% of it, and values are kept between a floor and a ceiling (MAX-MIN ant system).</p>
             <p>Links no ant uses sink to the floor. The map draws the two strongest outgoing links of each point, only where pheromone is at least 3× the floor. Wider, darker lines are stronger (the strongest are about 40× the floor).</p>
             <p>The map shows the pheromone each strategy <b>keeps</b> when the map changes, before the new ants run: what the planner remembers from its last plan. Retention keeps everything, selective reset clears links touching changed points, full reset clears it all (so its map shows none), and fast evaporation keeps it but burns it off faster over the next iterations.</p>
             <p>Every planner then runs 60 iterations on the new map, so they all end up with a similar strong set of links. The difference is where they start. Greedy and VNS have no pheromone.</p>

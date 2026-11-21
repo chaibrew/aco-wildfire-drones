@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 const NAV = [
   { href: "/", label: "Mission replay" },
   { href: "/explore", label: "Change size" },
-  { href: "/conclusion", label: "Conclusion" },
 ];
 
 export function SiteHeader({ sub }: { sub: string }) {
