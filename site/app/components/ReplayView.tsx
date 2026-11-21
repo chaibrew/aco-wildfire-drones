@@ -117,7 +117,7 @@ export default function ReplayView() {
   const [a, setA] = useState(asShown(params.get("a") ?? "tuned_retention"));
   const [b, setB] = useState(asShown(params.get("b") && params.get("b") !== "none" ? params.get("b")! : "tuned_full_reset"));
   const [compare, setCompare] = useState(params.get("b") !== "none");
-  const [speed, setSpeed] = useState(30);
+  const [speed, setSpeed] = useState(10);
   const [playing, setPlaying] = useState(false);
   const clock = useMemo(() => createClock(+(params.get("t") ?? 0) * 3600), [params]);
   const [t, setT] = useState(clock.get());
