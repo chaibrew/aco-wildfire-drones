@@ -12,3 +12,6 @@ outputs/*
 !outputs/.gitkeep
 data/cache/fields/
 prose-to-rewrite.md
+
+/results/cc/
+/results/mission/
