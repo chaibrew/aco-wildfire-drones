@@ -154,19 +154,3 @@ for i,label in enumerate(steps):
     a.text(x+1.45,1,label,ha='center',va='center',fontsize=12*SCALE,fontweight='bold',color='#1d2433')
     if i<3:a.add_patch(FancyArrowPatch((x+2.95,1),(x+3.35,1),arrowstyle='-|>',mutation_scale=20,color='#E8590C',lw=2))
 save('harness_flow.png')
-
-# 7: Illustrative pheromone strategies (not measured results)
-nodes=[(.4,.3),(1.2,.2),(1.85,.7),(1.3,1.2),(.5,1.1),(1.05,.68)]
-edges=[(0,1),(1,2),(2,3),(3,4),(4,0),(0,5),(1,5),(2,5),(3,5),(4,5)]
-cards=[('Retention','aco_retention','Keep pheromones'),('Fast evaporation','aco_fast_evaporation','Accelerate decay'),('Selective reset','aco_selective_reset','Reset near changes'),('Full reset','aco_full_reset','Clear pheromones')]
-fig,axes=plt.subplots(1,4,figsize=(12,3))
-for a,(name,pl,desc) in zip(axes,cards):
-    a.set_xlim(0,2.25);a.set_ylim(-.4,1.5);a.set_aspect('equal');a.axis('off')
-    for i,j in edges:
-        thin=pl=='aco_full_reset' or (pl=='aco_selective_reset' and 5 in (i,j))
-        a.plot(*zip(nodes[i],nodes[j]),color='#b8bfca' if thin else C[pl],lw=1.5 if thin else 5,solid_capstyle='round')
-    for i,(x,y) in enumerate(nodes):a.add_patch(Circle((x,y),.1 if i==5 else .07,color='#C92A2A' if i==5 else '#2b3445',zorder=3))
-    a.text(1.12,-.12,name,ha='center',fontweight='bold',color=C[pl],fontsize=12*SCALE)
-    a.text(1.12,-.32,desc,ha='center',fontsize=9*SCALE)
-fig.tight_layout();save('strategies.png')
-print('Finished: all plots generated from CSVs, except explanatory diagrams.')
