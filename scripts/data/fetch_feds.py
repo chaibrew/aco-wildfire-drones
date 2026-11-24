@@ -7,7 +7,7 @@ import urllib.request
 from pathlib import Path
 
 ARTICLE = "https://api.figshare.com/v2/articles/19170071/versions/1"
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def main():

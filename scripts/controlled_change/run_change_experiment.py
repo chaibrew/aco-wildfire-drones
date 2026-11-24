@@ -2,7 +2,7 @@ import argparse
 import os
 import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 
 from experiment import ExperimentConfig, captured_states, run_from_states, run_synthetic, write_csv  # noqa: E402
 from experiment.runner import PLANNERS, RESULT_FIELDS, TRACE_FIELDS  # noqa: E402

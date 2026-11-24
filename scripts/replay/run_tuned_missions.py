@@ -7,7 +7,7 @@ import sys
 import time
 from multiprocessing import Pool
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 
 from fire_sim.fire import load_fire  # noqa: E402
 from fire_sim.mission import MissionConfig, run_mission  # noqa: E402

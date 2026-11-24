@@ -115,7 +115,7 @@ def main():
     for name in args.planners:
         mine = [r for r in results if r["planner"] == name]
         print(f"{name:22s} " + " ".join(f"{statistics.mean(r[key] for r in mine):13.3f}" for key, _, _ in REPORT))
-    print(f"\nwrote {args.out}; run scripts/aco_analyse.py on it for paired comparisons")
+    print(f"\nwrote {args.out}; run scripts/replay/aco_analyse.py on it for paired comparisons")
 
 
 if __name__ == "__main__":

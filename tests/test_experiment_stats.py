@@ -123,7 +123,7 @@ def test_analysis_script_prints_the_interaction_section(tmp_path):
         w = csv.DictWriter(fh, fieldnames=list(rows[0]))
         w.writeheader()
         w.writerows(rows)
-    script = Path(__file__).resolve().parents[1] / "scripts" / "analyse_change_experiment.py"
+    script = Path(__file__).resolve().parents[1] / "scripts" / "controlled_change" / "analyse_change_experiment.py"
     out = subprocess.run([sys.executable, str(script), str(path), "--metric", "margin", "--group", "locality"],
                          capture_output=True, text=True)
     assert out.returncode == 0, out.stderr

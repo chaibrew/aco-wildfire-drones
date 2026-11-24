@@ -26,7 +26,7 @@ python scripts/site/change_grid.py outputs/site_change --trials 12 --workers 9
 cp outputs/site_change/change_grid.json site/public/data/
 ```
 
-`export_missions.py` needs `outputs/tuning_missions_d10/stages/` from `scripts/run_tuned_missions.py`. The replay shows one mission (seed 0) for each planner. The means on the replay page use all 10 seeds.
+`export_missions.py` needs `outputs/tuning_missions_d10/stages/` from `scripts/replay/run_tuned_missions.py`. The replay shows one mission (seed 0) for each planner. The means on the replay page use all 10 seeds.
 
 ## Deploy
 

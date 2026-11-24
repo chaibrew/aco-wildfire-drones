@@ -2,7 +2,7 @@ import argparse
 import os
 import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 
 from experiment.stats import (GROUPINGS, METRICS, change_interaction, format_interactions,  # noqa: E402
                               format_recovery, format_summary, load_rows, load_trace, paired_summary,

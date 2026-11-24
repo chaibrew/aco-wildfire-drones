@@ -16,7 +16,7 @@ python -m pip install --no-deps -e .
 pytest -q
 ```
 
-The tests do not use the network. 169 tests pass.
+The tests do not use the network. 162 tests pass.
 
 ## Repository
 
@@ -27,9 +27,32 @@ The tests do not use the network. 169 tests pass.
 | `src/baselines` | Greedy and VNS |
 | `src/experiment` | Controlled-change experiment and statistics |
 | `src/tuning` | F-Race and iterated race |
-| `scripts` | Commands that run the experiments and make the tables |
+| `scripts/controlled_change` | Controlled-change experiment: run, analyse, plot |
+| `scripts/replay` | 24 h Camp Fire replay: run, analyse, plot |
+| `scripts/tuning` | Parameter tuning |
+| `scripts/data` | FEDS download and a planner example |
+| `scripts/site` | Data for the demo site |
 | `outputs`, `results` | Result files that the report uses |
 | `site` | Demo site. Refer to [site/README.md](site/README.md). |
+
+## Code map
+
+| Report topic | Code |
+| --- | --- |
+| Ground-truth fire between FEDS perimeters | `fire_sim/spread.py` (`interpolate`, `SpreadModel`), `fire_sim/fire.py`, `fire_sim/weather.py` |
+| Fleet map, monitoring points and risk | `fire_sim/firemap.py`, `fire_sim/monitor.py` |
+| Mission loop and replans | `fire_sim/mission.py` (`run_mission`) |
+| Objective: J, margin, total overdue | `aco_router/evaluator.py` (`evaluate`), `aco_router/model.py` (`Metrics`) |
+| Ant construction and MAX–MIN bounds | `aco_router/aco.py` (`ACORouter`) |
+| Pheromone matrix and carry-over by point | `aco_router/pheromone.py` |
+| The four strategies | `aco_router/strategies.py` |
+| Parameters | `aco_router/config.py` (`ACOParams`) |
+| Greedy and VNS | `baselines/greedy.py`, `baselines/vns.py` |
+| F-Race and iterated race | `tuning/racing.py`, `tuning/tuner.py` |
+| Controlled change | `experiment/perturb.py` (`apply_change`), `experiment/runner.py` (`run_pair`) |
+| Paired intervals and Holm correction | `experiment/stats.py` |
+
+All paths are in `src/`.
 
 ## Reproduce the report
 
@@ -38,23 +61,23 @@ Run each command from the repository root. Each command writes its files to `out
 | Report section | Command | Result files in the repository |
 | --- | --- | --- |
 | Tuning (3.3.4, Appendix A) | Refer to [Tuning](#tuning) | None. The tables are in Appendix A of the report. |
-| Controlled change, main run (6.1) | `scripts/controlled_change_rerun.sh tuned` | `results/cc_tuned_rho01_results.zip` |
-| Controlled change, baselines (6.1) | `scripts/controlled_change_rerun.sh baselines` | `outputs/cc/camp_rho01_baselines.csv` |
-| Controlled change, before tuning (6.3) | `scripts/controlled_change_rerun.sh untuned` | `cc/camp_untuned_cycle.csv` in `results/cc_mission_results.zip` |
-| 24 h replay (6.2) | `python scripts/run_tuned_missions.py outputs/tuning_missions_d10 --baselines` | `outputs/tuning_missions_d10/` |
+| Controlled change, main run (6.1) | `scripts/controlled_change/controlled_change_rerun.sh tuned` | `results/cc_tuned_rho01_results.zip` |
+| Controlled change, baselines (6.1) | `scripts/controlled_change/controlled_change_rerun.sh baselines` | `outputs/cc/camp_rho01_baselines.csv` |
+| Controlled change, before tuning (6.3) | `scripts/controlled_change/controlled_change_rerun.sh untuned` | `cc/camp_untuned_cycle.csv` in `results/cc_mission_results.zip` |
+| 24 h replay (6.2) | `python scripts/replay/run_tuned_missions.py outputs/tuning_missions_d10 --baselines` | `outputs/tuning_missions_d10/` |
 
 To get the statistics:
 
 ```sh
-python scripts/analyse_change_experiment.py outputs/cc/camp_tuned_rho01_cycle.csv
-python scripts/analyse_tuned_missions.py outputs/tuning_missions_d10
+python scripts/controlled_change/analyse_change_experiment.py outputs/cc/camp_tuned_rho01_cycle.csv
+python scripts/replay/analyse_tuned_missions.py outputs/tuning_missions_d10
 ```
 
 To compare greedy and VNS with full reset, join the two controlled-change files first:
 
 ```sh
 (cat outputs/cc/camp_tuned_rho01_cycle.csv; tail -n +2 outputs/cc/camp_rho01_baselines.csv) > outputs/cc/camp_all.csv
-python scripts/analyse_change_experiment.py outputs/cc/camp_all.csv --group all --no-interaction
+python scripts/controlled_change/analyse_change_experiment.py outputs/cc/camp_all.csv --group all --no-interaction
 ```
 
 All runs use fixed seeds. The controlled-change runs use seeds 5000–5009 and the replay uses seeds 0–9. The tuning seeds do not overlap them.
@@ -64,14 +87,14 @@ All runs use fixed seeds. The controlled-change runs use seeds 5000–5009 and t
 Run the steps in this sequence. Each step starts from the untuned parameters. The last step uses F-Race candidate 19, which is the chosen setting.
 
 ```sh
-python scripts/tune_aco.py budget --camp --instances 20 --workers 8 --out outputs/tuning/budget
-python scripts/tune_aco.py shared --camp --ants 20 --iterations 60 --instances 30 --workers 9 --out outputs/tuning/shared
-python scripts/tune_aco.py irace --camp --ants 20 --iterations 60 --instances 30 --budget 1000 --workers 9 --out outputs/tuning/irace
-python scripts/tune_aco.py confirm defaults=defaults frace11=outputs/tuning/shared_candidate11.json \
+python scripts/tuning/tune_aco.py budget --camp --instances 20 --workers 8 --out outputs/tuning/budget
+python scripts/tuning/tune_aco.py shared --camp --ants 20 --iterations 60 --instances 30 --workers 9 --out outputs/tuning/shared
+python scripts/tuning/tune_aco.py irace --camp --ants 20 --iterations 60 --instances 30 --budget 1000 --workers 9 --out outputs/tuning/irace
+python scripts/tuning/tune_aco.py confirm defaults=defaults frace11=outputs/tuning/shared_candidate11.json \
     frace19=outputs/tuning/shared_candidate19.json irace51=outputs/tuning/irace_elite51.json \
     irace108=outputs/tuning/irace_elite108.json irace61=outputs/tuning/irace_elite61.json \
     irace41=outputs/tuning/irace_elite41.json --camp --workers 9 --out outputs/tuning/confirm
-python scripts/tune_aco.py fast-evaporation --params outputs/tuning/shared_candidate19.json --camp --ants 20 \
+python scripts/tuning/tune_aco.py fast-evaporation --params outputs/tuning/shared_candidate19.json --camp --ants 20 \
     --iterations 60 --instances 30 --workers 9 --out outputs/tuning/fast_evaporation
 ```
 
@@ -82,7 +105,7 @@ The final parameters are the defaults in `src/aco_router/config.py`. ρ stays at
 The repository contains the FEDS 2018 GeoPackage (`data/raw/`) and the weather and elevation for the tested fires (`data/cache/`). For another year, download it:
 
 ```sh
-python scripts/fetch_feds.py --year 2019
+python scripts/data/fetch_feds.py --year 2019
 fire-sim inspect data/raw/LargeFires_2019.gpkg
 ```
 
@@ -145,7 +168,7 @@ Both commands read one TOML file. Copy [configs/camp-3885.toml](configs/camp-388
 
 ## Connect a planner
 
-A planner is a function. It receives a `PlanningState` and returns `{drone_id: [cell_id, ...]}`. Use `evaluate(state, routes)` to calculate J for a plan. Refer to [scripts/continuous_example.py](scripts/continuous_example.py).
+A planner is a function. It receives a `PlanningState` and returns `{drone_id: [cell_id, ...]}`. Use `evaluate(state, routes)` to calculate J for a plan. Refer to [scripts/data/continuous_example.py](scripts/data/continuous_example.py).
 
 `smoke_router` only tests the pipeline. It is not a baseline.
 
