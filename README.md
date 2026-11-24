@@ -29,7 +29,6 @@ The tests do not use the network. 169 tests pass.
 | `src/tuning` | F-Race and iterated race |
 | `scripts` | Commands that run the experiments and make the tables |
 | `outputs`, `results` | Result files that the report uses |
-| `docs` | Model and method details |
 | `site` | Demo site. Refer to [site/README.md](site/README.md). |
 
 ## Reproduce the report
@@ -38,7 +37,7 @@ Run each command from the repository root. Each command writes its files to `out
 
 | Report section | Command | Result files in the repository |
 | --- | --- | --- |
-| Tuning (3.3.4, Appendix A) | Refer to [docs/tuning.md](docs/tuning.md), section 8 | Tables in `docs/tuning.md` |
+| Tuning (3.3.4, Appendix A) | Refer to [Tuning](#tuning) | None. The tables are in Appendix A of the report. |
 | Controlled change, main run (6.1) | `scripts/controlled_change_rerun.sh tuned` | `results/cc_tuned_rho01_results.zip` |
 | Controlled change, baselines (6.1) | `scripts/controlled_change_rerun.sh baselines` | `outputs/cc/camp_rho01_baselines.csv` |
 | Controlled change, before tuning (6.3) | `scripts/controlled_change_rerun.sh untuned` | `cc/camp_untuned_cycle.csv` in `results/cc_mission_results.zip` |
@@ -59,6 +58,24 @@ python scripts/analyse_change_experiment.py outputs/cc/camp_all.csv --group all 
 ```
 
 All runs use fixed seeds. The controlled-change runs use seeds 5000–5009 and the replay uses seeds 0–9. The tuning seeds do not overlap them.
+
+### Tuning
+
+Run the steps in this sequence. Each step starts from the untuned parameters. The last step uses F-Race candidate 19, which is the chosen setting.
+
+```sh
+python scripts/tune_aco.py budget --camp --instances 20 --workers 8 --out outputs/tuning/budget
+python scripts/tune_aco.py shared --camp --ants 20 --iterations 60 --instances 30 --workers 9 --out outputs/tuning/shared
+python scripts/tune_aco.py irace --camp --ants 20 --iterations 60 --instances 30 --budget 1000 --workers 9 --out outputs/tuning/irace
+python scripts/tune_aco.py confirm defaults=defaults frace11=outputs/tuning/shared_candidate11.json \
+    frace19=outputs/tuning/shared_candidate19.json irace51=outputs/tuning/irace_elite51.json \
+    irace108=outputs/tuning/irace_elite108.json irace61=outputs/tuning/irace_elite61.json \
+    irace41=outputs/tuning/irace_elite41.json --camp --workers 9 --out outputs/tuning/confirm
+python scripts/tune_aco.py fast-evaporation --params outputs/tuning/shared_candidate19.json --camp --ants 20 \
+    --iterations 60 --instances 30 --workers 9 --out outputs/tuning/fast_evaporation
+```
+
+The final parameters are the defaults in `src/aco_router/config.py`. ρ stays at 0.1.
 
 ## Data
 
@@ -128,16 +145,9 @@ Both commands read one TOML file. Copy [configs/camp-3885.toml](configs/camp-388
 
 ## Connect a planner
 
-A planner is a function. It receives a `PlanningState` and returns `{drone_id: [cell_id, ...]}`. Use `evaluate(state, routes)` to calculate J for a plan. Refer to [docs/simulation-contract.md](docs/simulation-contract.md) and [scripts/continuous_example.py](scripts/continuous_example.py).
+A planner is a function. It receives a `PlanningState` and returns `{drone_id: [cell_id, ...]}`. Use `evaluate(state, routes)` to calculate J for a plan. Refer to [scripts/continuous_example.py](scripts/continuous_example.py).
 
 `smoke_router` only tests the pipeline. It is not a baseline.
-
-## Documents
-
-- [docs/continuous-fire.md](docs/continuous-fire.md): fire model and validation
-- [docs/simulation-contract.md](docs/simulation-contract.md): planner interface
-- [docs/experiment-harness.md](docs/experiment-harness.md): baselines and controlled-change experiment
-- [docs/tuning.md](docs/tuning.md): parameter tuning
 
 ## Data sources
 
