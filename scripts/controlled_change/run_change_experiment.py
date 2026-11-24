@@ -1,29 +1,15 @@
-"""Controlled-change experiment: greedy, VNS and the four ACO pheromone strategies.
-
-Examples
-  # pilot (excluded from reported results by the analysis script)
-  python scripts/run_change_experiment.py --phase pilot --trials 3 --out outputs/pilot.csv
-
-  # final sweep on synthetic loops
-  python scripts/run_change_experiment.py --trials 30 --out outputs/change_synthetic.csv
-
-  # final sweep on real Camp Fire states captured from a mission replay
-  python scripts/run_change_experiment.py --source feds --trials 20 --out outputs/change_camp.csv
-
-Writes <out> (one row per trial x change x planner) and <out stem>_trace.csv.
-"""
 import argparse
 import os
 import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 
 from experiment import ExperimentConfig, captured_states, run_from_states, run_synthetic, write_csv  # noqa: E402
 from experiment.runner import PLANNERS, RESULT_FIELDS, TRACE_FIELDS  # noqa: E402
 
 
 def parse_args():
-    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = argparse.ArgumentParser()
     p.add_argument("--source", choices=("synthetic", "feds"), default="synthetic")
     p.add_argument("--phase", choices=("pilot", "final"), default="final")
     p.add_argument("--fractions", type=float, nargs="+", default=[0.05, 0.10, 0.20, 0.40, 0.60])

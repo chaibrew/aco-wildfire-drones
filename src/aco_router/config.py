@@ -27,7 +27,6 @@ class Tau0Mode(str, Enum):
     NEAREST_NEIGHBOUR = "nearest_neighbour"
 
 
-# defaults match fire_sim's MissionConfig
 PLANNING_HORIZON_S: float = 600.0
 DRONE_SPEED_MS: float = 15.0
 SERVICE_TIME_S: float = 5.0
@@ -45,11 +44,10 @@ HORIZON_TOLERANCE_S: float = 1e-9
 
 @dataclass(frozen=True)
 class ACOParams:
-    # Tuned defaults (docs/tuning.md); pre-tuning values are in tuning.tuner.UNTUNED_PARAMS.
     n_ants: int = 20
     alpha: float = 0.73
     beta: float = 2.49
-    rho: float = 0.1  # kept at the old default; see docs/tuning.md section 5.6
+    rho: float = 0.1
     deposit_q: float = 1.0
     tau0_mode: Tau0Mode = Tau0Mode.NEAREST_NEIGHBOUR
     tau0_constant: float = 1.0

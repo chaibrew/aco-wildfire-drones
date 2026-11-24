@@ -1,5 +1,0 @@
-{
-  "params": {"alpha": 0.690, "beta": 2.968, "urgency_weight": 2.020, "rho": 0.021, "tau_min_ratio": 0.0017,
-             "urgency_floor": 0.048},
-  "source": "docs/tuning.md section 5.3, iterated-race elite 51 (low-rho sensitivity setting)"
-}

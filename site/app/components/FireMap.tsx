@@ -4,16 +4,12 @@ import { memo, useEffect, useMemo, useState, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getHill, type XY } from "@/lib/data";
 
-/* Dotted map in the style of the template's DottedMap: the terrain is a grid of grey pixels (opacity from the
-   hillshade), and everything on top is drawn as square pixels and ▲ markers. Coordinates are km from the fire centre. */
-
 export const SIZE = 1000;
 
 export interface Proj {
   x: (km: number) => number;
   y: (km: number) => number;
   p: (xy: XY) => [number, number];
-  /** viewBox units per km */
   k: number;
 }
 
@@ -25,7 +21,6 @@ export function makeProj(center: XY, spanKm: number): Proj {
   return { x, y, p: (q) => [x(q[0]), y(q[1])], k };
 }
 
-/** Grey terrain pixels, sampled from the hillshade so ridges and valleys show through the dot grid. */
 function useTerrain(bounds: [number, number, number, number], proj: Proj, stepKm: number) {
   const [dots, setDots] = useState<{ x: number; y: number; o: number }[]>([]);
   useEffect(() => {
@@ -48,7 +43,7 @@ function useTerrain(bounds: [number, number, number, number], proj: Proj, stepKm
           const iy = Math.min(c.height - 1, Math.floor(((by1 - ky) / (by1 - by0)) * c.height));
           const i = (iy * c.width + ix) * 4;
           if (data[i + 3] < 10) continue;
-          const shade = data[i] / 255; // 0 = shadow, 1 = lit slope
+          const shade = data[i] / 255;
           out.push({ x: px, y: py, o: 0.18 + 0.7 * (1 - shade) ** 1.2 });
         }
       }
@@ -119,7 +114,6 @@ export function FireMap({ bounds, center, spanKm, caption, overlay, children, ti
   );
 }
 
-/** Square map pixel centred on (x, y). */
 export function Pixel({ x, y, size, fill, pulse, ring, onEnter, onLeave }: {
   x: number; y: number; size: number; fill: string; pulse?: boolean; ring?: string;
   onEnter?: () => void; onLeave?: () => void;
@@ -134,14 +128,11 @@ export function Pixel({ x, y, size, fill, pulse, ring, onEnter, onLeave }: {
   );
 }
 
-/* Pixel-art quadcopter, 8 rotor frames cut from the sprite sheet (public/sprites/drone-0..7.png, nose up). */
 export const DRONE_FRAMES = Array.from({ length: 8 }, (_, k) => `/sprites/drone-${k}.png`);
 if (typeof window !== "undefined") DRONE_FRAMES.forEach((src) => { const im = new Image(); im.src = src; });
 
-/** Rotor frame from wall-clock time, offset per drone so they do not spin in step. */
 export const rotorFrame = (i: number) => (Math.floor(performance.now() / 45) + i * 3) % 8;
 
-/** Heading in degrees for an SVG rotate(), 0 = nose up, from a movement vector in km (y up). */
 export const heading = (dx: number, dy: number) => (Math.atan2(dx, dy) * 180) / Math.PI;
 
 export function DroneSprite({ x, y, size, angle = 0, frame = 0, ring, onEnter, onLeave }: {
@@ -161,7 +152,6 @@ export function DroneSprite({ x, y, size, angle = 0, frame = 0, ring, onEnter, o
   );
 }
 
-/** ▲ marker, the template's edge-region triangle. */
 export function Triangle({ x, y, size, fill }: { x: number; y: number; size: number; fill: string }) {
   const s = size / 2.3;
   return (
@@ -178,7 +168,6 @@ export function polyline(proj: Proj, pts: XY[]) {
   return pts.map((q) => `${proj.x(q[0]).toFixed(1)},${proj.y(q[1]).toFixed(1)}`).join(" ");
 }
 
-/** Legend entries in the template's mono style. */
 export function LegendItem({ mark, children }: { mark: ReactNode; children: ReactNode }) {
   return <li className="flex items-center gap-2 text-sm text-gray-900 uppercase font-mono">{mark}{children}</li>;
 }

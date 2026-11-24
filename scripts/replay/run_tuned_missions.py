@@ -7,7 +7,7 @@ import sys
 import time
 from multiprocessing import Pool
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 
 from fire_sim.fire import load_fire  # noqa: E402
 from fire_sim.mission import MissionConfig, run_mission  # noqa: E402
@@ -43,7 +43,6 @@ def job(args):
     field, _ = load_fire(GPKG, fire_id=3885, year=2018, limit=8, seed=seed, cache_dir=CACHE)
     if setting == "baseline":
         params = None
-        # VNS gets the same number of plan evaluations as ACO (ants * iterations) per replan
         router = GreedyRouter() if strategy == "greedy" else VNSRouter(VNSParams(max_evaluations=ANTS * ITERATIONS), seed=seed)
     else:
         params = SETTINGS[setting].with_(n_ants=ANTS, max_iterations=ITERATIONS)

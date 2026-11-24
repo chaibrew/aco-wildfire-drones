@@ -1,10 +1,3 @@
-"""Base scenarios (the PlanningState before any controlled change).
-
-synthetic_state : closed, irregular loop of monitoring points. Needs no data, so
-                  it is used for unit tests, pilots and quick checks.
-captured_states : real PlanningStates recorded from a FEDS mission replay
-                  (needs the GeoPackage and `pip install -e .`).
-"""
 from __future__ import annotations
 
 import math
@@ -36,10 +29,10 @@ def synthetic_state(n_points: int = 60, n_drones: int = 6, seed: int = 0, *, cel
         risk = rng.choices((1, 2, 3), weights=risk_weights)[0]
         pts[cid] = MonitoringPoint(cid, (cid[0] + 0.5) * cell_size_m, (cid[1] + 0.5) * cell_size_m, risk,
                                    BASE_REVISIT_S / risk)
-    ids = sorted(pts, key=lambda c: math.atan2(pts[c].y, pts[c].x))  # spread drones around the loop
+    ids = sorted(pts, key=lambda c: math.atan2(pts[c].y, pts[c].x))
     drones = tuple(Drone(d, pts[ids[(d * len(ids)) // n_drones]].x, pts[ids[(d * len(ids)) // n_drones]].y)
                    for d in range(n_drones))
-    last_seen = {i: -rng.uniform(0.0, pts[i].revisit_s) for i in pts}  # points were seen up to q ago
+    last_seen = {i: -rng.uniform(0.0, pts[i].revisit_s) for i in pts}
     return PlanningState(0.0, horizon_s, speed_mps, service_s, drones, pts, last_seen,
                          coverage(pts, radius) if radius > 0 else None)
 
@@ -47,7 +40,6 @@ def synthetic_state(n_points: int = 60, n_drones: int = 6, seed: int = 0, *, cel
 def captured_states(gpkg: str, fire_id: int, year: int, *, snapshots: int = 8, cache: str = "data/cache",
                     seed: int = 0, cell_size_m: float = CELL_M, drones: int = 6, horizon_s: float = 600.0,
                     stages: tuple[int, ...] = (6, 40, 80)) -> dict[int, PlanningState]:
-    """Replay a FEDS fire with the greedy planner and keep the PlanningState seen at the given stages."""
     from fire_sim.fire import load_fire
     from fire_sim.mission import MissionConfig, run_mission
 

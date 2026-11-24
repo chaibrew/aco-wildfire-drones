@@ -42,9 +42,9 @@ def test_change_keeps_state_consistent():
     assert set(new.last_seen) == set(new.points) == set(new.coverage)
     for i, p in new.points.items():
         if i in base.points and p == base.points[i]:
-            assert new.last_seen[i] == base.last_seen[i]  # untouched points keep their history
+            assert new.last_seen[i] == base.last_seen[i]
         if i not in base.points:
-            assert new.last_seen[i] == base.time_s  # activation is not an observation
+            assert new.last_seen[i] == base.time_s
         assert p.revisit_s == 900 / p.risk
         assert all(j in new.points for j in new.coverage[i])
     assert info.n_after == len(new.points)
@@ -90,7 +90,7 @@ def test_run_pair_has_every_planner_equal_budgets_and_is_reproducible():
             assert r["evaluations"] <= budget
         assert math.isfinite(r["margin"]) and r["margin"] >= 1.0 or r["margin"] >= 0.0
         assert len({r["realised_fraction"]}) == 1
-    assert len({r["realised_fraction"] for r in rows}) == 1  # everyone saw the same change
+    assert len({r["realised_fraction"] for r in rows}) == 1
     rows2, _ = run_pair(base, ChangeSpec(0.3, "concentrated"), SMALL, seed=0)
     assert _compare_cols(rows) == _compare_cols(rows2)
     assert {t["planner"] for t in traces} == set(PLANNERS)

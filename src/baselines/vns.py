@@ -1,22 +1,3 @@
-"""Variable Neighbourhood Search (VNS) baseline.
-
-Follows the scheme Bailon-Ruiz et al. (2022) use for wildfire UAV routing: start from
-a greedy solution, repeatedly *shake* the incumbent in a neighbourhood of increasing
-size k, descend with a randomised variable neighbourhood descent (VND), and accept the
-result only if it is better (then k resets to 1).
-
-Fairness with the ACO router
-  * Same ordering of solutions: `Metrics.score = (margin, total_overdue, distance)`,
-    computed by the same `aco_router.evaluate` the ACO router uses.
-  * Same budget unit: the number of *distinct* full plan evaluations. ACO spends
-    n_ants * max_iterations of them per replan; set `VNSParams.max_evaluations` to that
-    number (the experiment runner does this). A wall-clock budget is also supported.
-  * Feasibility checks and cache hits are free; they are not evaluations.
-
-The search is stateless between replans (cold start from greedy every time), so VNS
-neither benefits from nor is hurt by what changed. That is deliberate: it is the
-"no memory" reference for the pheromone-handling variants.
-"""
 from __future__ import annotations
 
 import math
@@ -40,10 +21,10 @@ _TOL = 1e-9
 @dataclass(frozen=True)
 class VNSParams:
     max_evaluations: int = 150
-    time_budget_s: float | None = None  # if set, stop on whichever limit is hit first
-    k_max: int = 3  # largest shake strength (number of random moves)
-    ls_samples: int = 8  # sampled neighbours per VND neighbourhood before moving on
-    patience: int = 100  # stop after this many iterations that found no new distinct plan (tiny search spaces)
+    time_budget_s: float | None = None
+    k_max: int = 3
+    ls_samples: int = 8
+    patience: int = 100
 
     def __post_init__(self) -> None:
         if self.max_evaluations < 1:
@@ -59,12 +40,8 @@ class VNSResult:
     evaluations: int
     iterations: int
     runtime_s: float
-    trace: tuple[TraceEntry, ...]  # iteration = evaluations used so far
+    trace: tuple[TraceEntry, ...]
 
-
-# --------------------------------------------------------------------------- moves
-# Each move copies the routes, edits the copy and returns it (None if not applicable).
-# Feasibility (horizon) is checked by the caller.
 
 def _copy(routes: Routes) -> Routes:
     return {d: list(r) for d, r in routes.items()}
@@ -123,7 +100,6 @@ def two_opt(routes: Routes, rng: random.Random, ids=None) -> Routes | None:
 
 
 def replace_visit(routes: Routes, rng: random.Random, ids=None) -> Routes | None:
-    """Swap a visited point for another point (often one nobody visits)."""
     cands = _nonempty(routes)
     if not cands or not ids:
         return None
@@ -141,7 +117,6 @@ def replace_visit(routes: Routes, rng: random.Random, ids=None) -> Routes | None
 
 
 def insert_visit(routes: Routes, rng: random.Random, ids=None) -> Routes | None:
-    """Add a visit if there is slack left in the horizon."""
     if not ids:
         return None
     new = _copy(routes)
@@ -164,11 +139,7 @@ LOCAL_SEARCH_MOVES = (relocate_intra, relocate_inter, swap, two_opt, replace_vis
 SHAKE_MOVES = (relocate_inter, swap, two_opt, replace_visit, remove_visit)
 
 
-# -------------------------------------------------------------------------- search
-
 class _Problem:
-    """Feasibility test and a counted, cached evaluation for one PlanningState."""
-
     def __init__(self, state: PlanningState):
         self.state = state
         self.instance = state_to_instance(state)
@@ -202,8 +173,6 @@ class _Problem:
 
 
 class VNSRouter:
-    """Callable planner: `router(PlanningState) -> {drone_id: [point ids]}`."""
-
     def __init__(self, params: VNSParams = VNSParams(), seed: int = 0, name: str = "vns"):
         self.params = params
         self.name = name
@@ -228,12 +197,12 @@ class VNSRouter:
         iterations = 0
         if prob.ids:
             k = 1
-            stale = 0  # consecutive iterations that produced no new distinct plan
+            stale = 0
             while not self._spent(prob, start) and stale < self.params.patience:
                 iterations += 1
                 before = prob.evaluations
                 x = self._shake(prob, best, k)
-                if x is None:  # no applicable shake
+                if x is None:
                     stale += 1
                     continue
                 m = prob.evaluate(x)
@@ -247,7 +216,6 @@ class VNSRouter:
                                         best_m.margin, best_m.total_overdue))
         return VNSResult(best, best_m, prob.evaluations, iterations, time.perf_counter() - start, tuple(trace))
 
-    # -- internals
     def _spent(self, prob: _Problem, start: float) -> bool:
         if prob.evaluations >= self.params.max_evaluations:
             return True
@@ -272,7 +240,6 @@ class VNSRouter:
         return cur if changed else None
 
     def _descend(self, prob: _Problem, cur: Routes, cur_m: Metrics, start: float):
-        """Randomised VND: sample neighbours of N_1..N_6, first improvement, restart at N_1."""
         n = 0
         while n < len(LOCAL_SEARCH_MOVES):
             improved = False

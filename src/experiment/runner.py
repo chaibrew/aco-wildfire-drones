@@ -1,19 +1,3 @@
-"""Controlled-change experiment: one paired trial = one base scenario + one perturbation.
-
-Protocol (matches the proposal's "Experimental design" table)
-  1. Build the base PlanningState S0 (synthetic or captured from a FEDS replay).
-  2. Warm up ONE ACO router on S0 for `warmup` replans, so it holds pheromone for S0.
-     Warm-up is identical for every strategy (no change has occurred, so no strategy acts).
-     The pre-change router state is snapshotted: every strategy starts from the SAME
-     pheromone, tau_0 and RNG state ("identical pre-change pheromone").
-  3. Apply one controlled change (magnitude x locality) to get S1. Same S1 for everyone.
-  4. Every planner replans S1 with the same budget:
-        greedy, vns (cold start), aco_retention, aco_full_reset,
-        aco_fast_evaporation, aco_selective_reset (restored from the snapshot).
-     All ACO variants and VNS use the same RNG seed ("paired trials").
-  5. Every returned plan is re-scored by `fire_sim.simulation.evaluate` on S1, which also
-     raises if a plan breaks the horizon rule, so no planner can cheat the objective.
-"""
 from __future__ import annotations
 
 import csv
@@ -47,19 +31,19 @@ TRACE_FIELDS = ["phase", "scenario", "trial", "target_fraction", "locality", "pl
 
 @dataclass(frozen=True)
 class ExperimentConfig:
-    phase: str = "final"  # "pilot" rows are written but excluded by the analysis script
-    scenario: str = "synthetic"  # label written to the CSV
+    phase: str = "final"
+    scenario: str = "synthetic"
     fractions: tuple[float, ...] = (0.05, 0.10, 0.20, 0.40, 0.60)
     localities: tuple[str, ...] = ("concentrated", "distributed")
     kind: str = "mixed"
     direction: str = "cycle"
     trials: int = 10
     first_seed: int = 0
-    warmup: int = 5  # replans on the base state before the change
+    warmup: int = 5
     ants: int = 20
     iterations: int = 60
-    vns_evaluations: int | None = None  # None: ants * iterations (equal budget)
-    n_points: int = 60  # synthetic only
+    vns_evaluations: int | None = None
+    n_points: int = 60
     drones: int = 6
     cell_size_m: float = 1000.0
     sensor_radius_m: float | None = None
@@ -82,7 +66,6 @@ class ExperimentConfig:
 
 
 def score_routes(state: PlanningState, routes: dict) -> dict:
-    """Ground-truth scoring with the simulator's own evaluator (raises on infeasible routes)."""
     ev = fire_sim_evaluate(state, routes)
     ratios = {i: g / state.points[i].revisit_s for i, g in ev.gaps_s.items()}
     return {
@@ -107,7 +90,6 @@ def warm_router(state: PlanningState, cfg: ExperimentConfig, seed: int) -> ACORo
 
 def run_pair(base: PlanningState, spec: ChangeSpec, cfg: ExperimentConfig, seed: int,
              label: str = "") -> tuple[list[dict], list[dict]]:
-    """Run every planner on one (base, change). Returns (result rows, trace rows)."""
     run_aco = any(n.startswith("aco_") for n in cfg.planners)
     snap = warm_router(base, cfg, seed).snapshot() if run_aco else None
     changed, info = apply_change(base, spec, seed + 10_000, cell_size_m=cfg.cell_size_m,
@@ -150,7 +132,7 @@ def run_pair(base: PlanningState, spec: ChangeSpec, cfg: ExperimentConfig, seed:
             continue
         router = ACORouter(cfg.aco_params(), strategy=strategy, seed=replan_seed)
         router.restore(snap)
-        router.reseed(replan_seed)  # identical random stream for every strategy
+        router.reseed(replan_seed)
         result = router.plan(inst1, change)
         acted = router.last_change
         reset = len(acted.reset_scope) if strategy is StrategyName.SELECTIVE_RESET and acted is not None else ""
@@ -200,7 +182,6 @@ def _state_job(args):
 
 
 def run_from_states(bases: dict[str, PlanningState], cfg: ExperimentConfig, progress: Callable[[str], None] = print):
-    """Same protocol on real captured states, e.g. {'camp3885_stage40': state, ...}."""
     jobs = [(cfg, label, base, seed, f, loc) for label, base in bases.items()
             for seed in range(cfg.first_seed, cfg.first_seed + cfg.trials)
             for f, loc in product(cfg.fractions, cfg.localities)]

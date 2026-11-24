@@ -33,7 +33,6 @@ FAST_EVAPORATION_NAMES = ("rho_high", "fast_evaporation_iterations")
 RHO_HIGH_GRID = (0.2, 0.3, 0.5, 0.7, 0.9)
 K_GRID = (2, 5, 10, 20)
 
-# Fixed copy of the pre-tuning values: "defaults" must still mean untuned after config.py changed.
 UNTUNED_PARAMS = ACOParams(n_ants=10, max_iterations=15, alpha=1.0, beta=1.0, rho=0.1, urgency_weight=2.0,
                            urgency_floor=0.05, tau_min_ratio=0.01, rho_high=0.5, fast_evaporation_iterations=10)
 
@@ -92,7 +91,6 @@ class SeedPlan:
     stages: tuple[int, ...]
 
 
-# Must stay disjoint from each other and from the reported experiments (seeds from 0).
 SEEDS: dict[str, SeedPlan] = {
     "shared": SeedPlan(1000, 1000, (20, 60, 100)),
     "irace": SeedPlan(1200, 1200, (25, 65, 105)),
@@ -181,7 +179,7 @@ def score_setting(params: ACOParams, inst: TuningInstance, strategies: Sequence[
     for strategy in strategies:
         router = ACORouter(params, strategy=strategy, seed=inst.seed)
         router.restore(snap)
-        router.reseed(inst.seed + REPLAN_SEED_OFFSET)  # same random stream for every strategy (paired comparison)
+        router.reseed(inst.seed + REPLAN_SEED_OFFSET)
         result = router.plan(inst1, change)
         out[StrategyName(strategy).value] = Scores.of_plan(changed, result.plan.for_drones(inst1.drone_ids),
                                                            result.runtime_s)

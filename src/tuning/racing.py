@@ -140,7 +140,6 @@ def race(n_candidates: int, n_instances: int, evaluate: Evaluate, *, first_test:
     steps: list[RaceStep] = []
 
     def rescore() -> None:
-        # every earlier block is re-ranked on the candidates still alive
         used = len(results)
         costs[:used] = np.nan
         costs[:used][:, alive] = np.array([score([r[c] for c in alive]) for r in results], dtype=float)

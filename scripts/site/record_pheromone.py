@@ -1,20 +1,3 @@
-"""Re-run the seed-0 tuned ACO missions and record the pheromone at every replan, for the site's replay map.
-
-The 24 h mission recordings (scripts/run_tuned_missions.py) keep points, drones and routes but not pheromone.
-This script repeats the same missions (same fire, seed, parameters and budget, so the same plans) and stores,
-per replan, the strongest pheromone edges at two moments:
-
-  ph_change  right after the change is applied (carry-over by point id, then the strategy's reset)
-  ph_plan    after the replan's iterations, i.e. the pheromone the plan was built from
-
-Pheromone is shown relative to the MMAS floor, not tau0: with every ant depositing and tau clipped to
-[0.024 tau_max, tau_max], tau_max sits below tau0, so learned edges are a multiple of the floor while unused
-edges sit on it. Edges exactly at tau0 were just reset (or are new) and carry nothing learned, so they are
-skipped. Each snapshot is the top-k outgoing point-to-point edges per point with tau/floor >= FLOOR_X, as
-(x1, y1, x2, y2, tau/floor) in metres. Routes are stored too so export_missions.py can check the re-run matches the recording.
-
-    python scripts/site/record_pheromone.py outputs/site_pheromone
-"""
 import os
 import pickle
 import sys
@@ -30,7 +13,7 @@ from fire_sim.mission import MissionConfig, run_mission  # noqa: E402
 
 from aco_router import ACOParams, ACORouter, FireSimRouter, StrategyName  # noqa: E402
 
-ANTS, ITERATIONS = 20, 60  # as scripts/run_tuned_missions.py
+ANTS, ITERATIONS = 20, 60
 GPKG, CACHE = "data/raw/LargeFires_2018.gpkg", "data/cache"
 SEED = 0
 DRONES = (6, 10, 12)
@@ -38,13 +21,13 @@ TOP_K, FLOOR_X = 2, 3.0
 
 
 def top_edges(ph, tau0, coords):
-    idx = [i for key, i in ph.index.items() if key in coords]  # drop drone start nodes
+    idx = [i for key, i in ph.index.items() if key in coords]
     if not idx:
         return []
     sub = ph.tau[np.ix_(idx, idx)]
     learned = ~np.isclose(sub, tau0, rtol=1e-9)
     if not learned.any():
-        return []  # all reset (full reset at a change)
+        return []
     floor = sub[learned].min()
     out = []
     for a, i in enumerate(idx):

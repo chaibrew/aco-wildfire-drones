@@ -1,4 +1,3 @@
-"""Shared settings for the site exports: data paths and the km grid centred on the early fire."""
 import functools
 import json
 import os

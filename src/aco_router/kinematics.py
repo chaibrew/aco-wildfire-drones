@@ -29,6 +29,5 @@ def route_schedule(instance: MissionInstance, drone: Drone, route: Sequence[Poin
 
 
 def max_gap(last_seen: float, observation_times: Iterable[float], t_end: float) -> float:
-    # longest gap between last seen, each observation and the end of the horizon
     boundaries = [last_seen, *sorted(set(observation_times)), t_end]
     return max(b - a for a, b in zip(boundaries, boundaries[1:]))

@@ -5,7 +5,7 @@ import os
 import sys
 import time
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 
 from aco_router import ACOParams, StrategyName  # noqa: E402
 from tuning import (SEEDS, SHARED_SPACE, UNTUNED_PARAMS, ParallelEvaluator, camp_states,  # noqa: E402

@@ -46,7 +46,6 @@ export function SiteFooter() {
   );
 }
 
-/** Page shell from the template's page.tsx. */
 export function Shell({ sub, children }: { sub: string; children: React.ReactNode }) {
   return (
     <main className="font-mono min-h-screen max-w-[min(100vw,1600px)] mx-auto relative overflow-x-clip md:rounded-md flex flex-col md:block px-4 sm:px-6 pt-8 md:pt-16 pb-10">

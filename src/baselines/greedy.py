@@ -21,7 +21,7 @@ def greedy_routes(state: PlanningState) -> Routes:
 
     while queue:
         now, drone_id, x, y = heapq.heappop(queue)
-        best = None  # (score, -travel, tie-break, id, arrival)
+        best = None
         for i in ids:
             p = state.points[i]
             travel = math.hypot(p.x - x, p.y - y) / state.speed_mps + state.service_s
@@ -33,7 +33,7 @@ def greedy_routes(state: PlanningState) -> Routes:
             if best is None or key > best[0]:
                 best = (key, i, arrival)
         if best is None:
-            continue  # this drone has nothing left that fits; it waits where it is
+            continue
         _, i, arrival = best
         p = state.points[i]
         routes[drone_id].append(i)
@@ -45,8 +45,6 @@ def greedy_routes(state: PlanningState) -> Routes:
 
 
 class GreedyRouter:
-    """Callable planner: `router(PlanningState) -> {drone_id: [point ids]}`."""
-
     name = "greedy"
 
     def __call__(self, state: PlanningState) -> Routes:
