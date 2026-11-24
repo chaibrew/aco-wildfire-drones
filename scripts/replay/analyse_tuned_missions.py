@@ -1,12 +1,17 @@
 import csv
+import os
 import sys
 from collections import defaultdict
 
 import numpy as np
 from scipy.stats import wilcoxon
 
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
+
+from experiment.stats import holm_adjust  # noqa: E402
+
 OUT = sys.argv[1]
-MEASURES = ("true_overdue_mean", "true_J_mean", "true_max_gap_mean", "map_overdue_mean", "planning_s_mean")
+MEASURES = ("true_overdue_mean", "map_J_mean", "true_J_mean", "true_max_gap_mean", "map_overdue_mean", "planning_s_mean")
 rows = list(csv.DictReader(open(f"{OUT}/missions.csv")))
 runs = defaultdict(dict)
 for r in rows:
@@ -49,7 +54,14 @@ for drones in sorted({k[0] for k in runs}):
                 for s in strategies:
                     summary.append(paired(drones, [(b, f"aco_{s}_{setting}")], m, f"aco_{setting}_vs_{b}",
                                           b, f"aco_{s}_{setting}"))
+        summary.append(paired(drones, [("greedy", "vns")], m, "vns_vs_greedy", "greedy", "vns"))
 summary = [s for s in summary if s]
+families = defaultdict(list)
+for s in summary:
+    families[(s["drones"], s["comparison"], s["measure"], s["reference"] == "aco_untuned_all")].append(s)
+for members in families.values():
+    for s, adj in zip(members, holm_adjust([s["p"] for s in members])):
+        s["p_holm"] = adj
 
 with open(f"{OUT}/missions_summary.csv", "w", newline="") as fh:
     w = csv.DictWriter(fh, fieldnames=list(summary[0]))
@@ -59,14 +71,16 @@ with open(f"{OUT}/missions_summary.csv", "w", newline="") as fh:
 print("planner means (lower is better)")
 for (drones, name), by_seed in sorted(runs.items()):
     v = [float(r["true_overdue_mean"]) for r in by_seed.values()]
+    mj = [float(r["map_J_mean"]) for r in by_seed.values()]
     j = [float(r["true_J_mean"]) for r in by_seed.values()]
+    f = [float(r["front_on_map_mean"]) for r in by_seed.values()]
     t = [float(r["planning_s_mean"]) for r in by_seed.values()]
-    print(f"  d{drones:<3d} {name:30s} n={len(v):2d}  overdue {np.mean(v):7.2f}  true J {np.mean(j):7.3f}  "
-          f"planning {np.mean(t):6.3f} s")
-for m in ("true_overdue_mean", "true_J_mean"):
+    print(f"  d{drones:<3d} {name:30s} n={len(v):2d}  overdue {np.mean(v):7.2f}  map J {np.mean(mj):6.3f}  "
+          f"true J {np.mean(j):7.3f}  front on map {np.mean(f):5.3f}  planning {np.mean(t):6.3f} s")
+for m in ("true_overdue_mean", "map_J_mean", "true_J_mean"):
     print(f"\n{m}  (b/t/w = other better/tied/worse than reference)")
-    print(f"{'d':>3s} {'reference':>18s} {'other':>30s} {'n':>3s} {'ref':>8s} {'other':>8s} {'change':>8s} {'b/t/w':>8s} {'p':>8s}")
+    print(f"{'d':>3s} {'reference':>18s} {'other':>30s} {'n':>3s} {'ref':>8s} {'other':>8s} {'change':>8s} {'b/t/w':>8s} {'p':>8s} {'Holm p':>8s}")
     for s in summary:
         if s["measure"] == m:
             print(f"{s['drones']:3d} {s['reference']:>18s} {s['other']:>30s} {s['n']:3d} {s['reference_mean']:8.3f} "
-                  f"{s['other_mean']:8.3f} {s['pct_change']:+7.1f}% {s['other_better']:2d}/{s['tied']}/{s['other_worse']:<2d} {s['p']:8.2g}")
+                  f"{s['other_mean']:8.3f} {s['pct_change']:+7.1f}% {s['other_better']:2d}/{s['tied']}/{s['other_worse']:<2d} {s['p']:8.2g} {s['p_holm']:8.2g}")

@@ -27,8 +27,8 @@ The tests do not use the network. 162 tests pass.
 | `src/baselines` | Greedy and VNS |
 | `src/experiment` | Controlled-change experiment and statistics |
 | `src/tuning` | F-Race and iterated race |
-| `scripts/controlled_change` | Controlled-change experiment: run, analyse, plot |
-| `scripts/replay` | 24 h Camp Fire replay: run, analyse, plot |
+| `scripts/controlled_change` | Controlled-change experiment: run and analyse |
+| `scripts/replay` | 24 h Camp Fire replay: run and analyse |
 | `scripts/tuning` | Parameter tuning |
 | `scripts/data` | FEDS download and a planner example |
 | `scripts/site` | Data for the demo site |
@@ -61,30 +61,27 @@ Run each command from the repository root. Each command writes its files to `out
 | Report section | Command | Result files in the repository |
 | --- | --- | --- |
 | Tuning (3.3.4, Appendix A) | Refer to [Tuning](#tuning) | None. The tables are in Appendix A of the report. |
-| Controlled change, main run (6.1) | `scripts/controlled_change/controlled_change_rerun.sh tuned` | `results/cc_tuned_rho01_results.zip` |
-| Controlled change, baselines (6.1) | `scripts/controlled_change/controlled_change_rerun.sh baselines` | `outputs/cc/camp_rho01_baselines.csv` |
-| Controlled change, before tuning (6.3) | `scripts/controlled_change/controlled_change_rerun.sh untuned` | `cc/camp_untuned_cycle.csv` in `results/cc_mission_results.zip` |
-| 24 h replay (6.2) | `python scripts/replay/run_tuned_missions.py outputs/tuning_missions_d10 --baselines` | `outputs/tuning_missions_d10/` |
+| Controlled change, ACO (6.1, 6.3) | `scripts/controlled_change/controlled_change_rerun.sh tuned` | `results/cc_tuned_rho01_results.zip` |
+| Controlled change, greedy and VNS (6.1) | `scripts/controlled_change/controlled_change_rerun.sh baselines` | `outputs/cc/camp_rho01_baselines.csv` |
+| 24 h replay (6.2, 6.4) | `python scripts/replay/run_tuned_missions.py outputs/tuning_missions_d10 --baselines` | `outputs/tuning_missions_d10/` |
 
-To get the statistics:
+The replay command replaces the files in `outputs/tuning_missions_d10/`.
+
+To get the statistics from the result files in the repository, extract the ACO file first:
 
 ```sh
-python scripts/controlled_change/analyse_change_experiment.py outputs/cc/camp_tuned_rho01_cycle.csv
+unzip results/cc_tuned_rho01_results.zip -d outputs
+python scripts/controlled_change/report_tables.py outputs/cc/camp_tuned_rho01_cycle.csv outputs/cc/camp_rho01_baselines.csv
 python scripts/replay/analyse_tuned_missions.py outputs/tuning_missions_d10
 ```
 
-To compare greedy and VNS with full reset, join the two controlled-change files first:
-
-```sh
-(cat outputs/cc/camp_tuned_rho01_cycle.csv; tail -n +2 outputs/cc/camp_rho01_baselines.csv) > outputs/cc/camp_all.csv
-python scripts/controlled_change/analyse_change_experiment.py outputs/cc/camp_all.csv --group all --no-interaction
-```
+`report_tables.py` gives the numbers in 6.1 and 6.3. `analyse_tuned_missions.py` gives the numbers in 6.2 and 6.4.
 
 All runs use fixed seeds. The controlled-change runs use seeds 5000–5009 and the replay uses seeds 0–9. The tuning seeds do not overlap them.
 
 ### Tuning
 
-Run the steps in this sequence. Each step starts from the untuned parameters. The last step uses F-Race candidate 19, which is the chosen setting.
+Run the steps in this sequence. Steps 1 to 4 start from the untuned parameters. Step 5 starts from F-Race candidate 19, which is the chosen setting.
 
 ```sh
 python scripts/tuning/tune_aco.py budget --camp --instances 20 --workers 8 --out outputs/tuning/budget
