@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser()
     parser.add_argument("--year", type=int, choices=range(2012, 2021), default=2018)
     args = parser.parse_args()
     raw = ROOT / "data/raw"

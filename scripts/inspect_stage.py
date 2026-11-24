@@ -1,8 +1,3 @@
-"""Inspect one stage, or scan for stages that jump, in a stages.csv from mission_replay.py.
-
-    python scripts/inspect_stage.py outputs/replay-24h/stages.csv --stage 40
-    python scripts/inspect_stage.py outputs/replay-24h/stages.csv --scan --metric true_objective
-"""
 import argparse
 import sys
 from pathlib import Path
@@ -17,7 +12,7 @@ def share(x):
 
 
 def main():
-    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = argparse.ArgumentParser()
     p.add_argument("stages_csv")
     p.add_argument("--stage", type=int)
     p.add_argument("--window", type=int, default=3)

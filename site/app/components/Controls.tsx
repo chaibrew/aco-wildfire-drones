@@ -11,7 +11,6 @@ export function Field({ label, children, className }: { label: ReactNode; childr
   );
 }
 
-/** Single-choice segmented control in the template's flat mono style. */
 export function Seg<T extends string | number>({ value, options, onChange, className, label }: {
   value: T;
   options: { value: T; label: ReactNode; color?: string }[];

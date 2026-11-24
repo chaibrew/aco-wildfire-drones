@@ -1,12 +1,3 @@
-"""Rerun full Camp Fire missions for Greedy and VNS at several drone counts, saving every stage.
-
-    python scripts/mission_replay.py --drones 6 12 --seeds 10 --hours 24 --out outputs/replay-24h
-
-Then look at a stage:   python scripts/inspect_stage.py outputs/replay-24h/stages.csv --stage 40
-Scan for jumps:         python scripts/inspect_stage.py outputs/replay-24h/stages.csv --scan
-Add --resume to continue an interrupted run.  VNS gets --vns-evaluations plan evaluations per
-replan (default ants * iterations, the same budget unit as ACO).
-"""
 import argparse
 import sys
 from pathlib import Path
@@ -18,7 +9,7 @@ from fire_sim.fire import load_fire  # noqa: E402
 
 
 def main():
-    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = argparse.ArgumentParser()
     p.add_argument("--gpkg", default="data/raw/LargeFires_2018.gpkg")
     p.add_argument("--fire-id", type=int, default=3885)
     p.add_argument("--year", type=int, default=2018)

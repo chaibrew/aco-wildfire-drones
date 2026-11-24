@@ -1,12 +1,3 @@
-"""Controlled-change grid for the demo site.
-
-Runs the paired protocol of src/experiment/runner.py (warm one ACO router, snapshot it, apply one
-change, replan with every planner) on Camp Fire planning states, and records what the site needs to
-show it: the points before and after the change, every planner's routes and scores, and the pheromone
-held by each ACO strategy right after the change and after replanning.
-
-  python scripts/site/change_grid.py outputs/site_change --trials 8 --workers 8
-"""
 import argparse
 import json
 import os
@@ -30,16 +21,14 @@ from experiment.runner import STRATEGY_ORDER, ExperimentConfig, score_routes, wa
 
 from common import GPKG, CACHE, FIRE, km  # noqa: E402
 
-# the site shows the tuned ACO only
 SETTINGS = {"tuned": ACOParams()}
 FRACTIONS = (0.05, 0.10, 0.20, 0.30, 0.40, 0.60)
 LOCALITIES = ("concentrated", "distributed")
-DETAIL_TRIALS = 2  # trials per cell whose routes and pheromone are kept for the map
+DETAIL_TRIALS = 2
 STATES: dict = {}
 
 
 def top_edges(ph, tau0, index, k=2, floor=1.5):
-    """Strongest k outgoing edges per point, as [from, to, tau/tau0], only where tau/tau0 >= floor."""
     out = []
     for key, i in ph.index.items():
         if key not in index:
@@ -104,7 +93,6 @@ def job(args):
         router = ACORouter(cfg.aco_params(), strategy=strategy, seed=replan_seed)
         router.restore(snap)
         router.reseed(replan_seed)
-        # pheromone the strategy starts from: carried over to the new points, then the strategy's reset
         ph = snap.pheromone.remapped(node_keys(inst1), snap.tau0)
         make_strategy(strategy).on_change(ph, change, snap.tau0)
         result = router.plan(inst1, change)

@@ -1,6 +1,5 @@
 "use client"
 
-/* Data files in public/data, written by scripts/site/export_missions.py and scripts/site/change_grid.py. */
 import { useEffect, useState } from "react"
 
 export type XY = [number, number]
@@ -31,7 +30,6 @@ export interface PlannerResult {
   ph_change?: [number, number, number][]
   ph_after?: [number, number, number][]
 }
-/** point: [x, y, risk, staleness, affected] */
 export type GridPoint = [number, number, number, number, number]
 export interface Trial {
   stage: number
@@ -90,7 +88,6 @@ export function getHill() {
   return hill
 }
 
-/* ---------- mission runs ---------- */
 export interface Run {
   P: [number, number, number][]
   stages: RawRun["stages"]
@@ -133,7 +130,6 @@ export function stagePoints(run: Run, k: number) {
   return out
 }
 
-/** Pheromone kept from the previous plan, right after the change (none at stage 0). Each edge is [from, to, tau / MMAS floor]. */
 export type PhEdge = [XY, XY, number]
 const phCache = new WeakMap<Run, Map<string, PhEdge[]>>()
 export function stagePheromone(run: Run, k: number): PhEdge[] | null {
@@ -164,7 +160,6 @@ export function dronePos(trip: Run["trips"][number], t: number): XY | null {
   return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]
 }
 
-/* ---------- URL state (query string per page) ---------- */
 export function readQuery() {
   return new URLSearchParams(typeof window === "undefined" ? "" : window.location.search)
 }

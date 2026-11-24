@@ -1,14 +1,3 @@
-"""Export the recorded 24 h Camp Fire missions to compact JSON for the demo site.
-
-  python scripts/site/export_missions.py site/public/data
-
-Reads outputs/tuning_missions*/ (missions.csv and stages/*.pkl, written by scripts/run_tuned_missions.py).
-Writes:
-  index.json                 fire outline, FEDS perimeters, bounds, the run list and per-run summary numbers
-  fire/s{seed}.json          modelled fire-arrival isochrones (1 h steps) for that mission seed
-  runs/{run}.json            one mission: point table, per-stage staleness, per-stage metrics, drone trips
-  hillshade.png              terrain backdrop
-"""
 import csv
 import glob
 import json
@@ -32,10 +21,9 @@ from fire_sim.terrain import fetch_elevation  # noqa: E402
 
 OUT = sys.argv[1]
 SOURCES = ("outputs/tuning_missions", "outputs/tuning_missions_d10")
-SEEDS = {0}  # the replay shows one mission; the full 10 seeds stay in the summary numbers
+SEEDS = {0}
 
 
-# the site shows the tuned ACO (labelled plain "ACO") and the baselines
 SETTINGS = {"tuned", "baseline"}
 
 
@@ -74,11 +62,10 @@ def isochrones(seed, origin):
     return out
 
 
-PHEROMONE = "outputs/site_pheromone"  # written by scripts/site/record_pheromone.py (tuned ACO, seed 0)
+PHEROMONE = "outputs/site_pheromone"
 
 
 def load_pheromone(rec):
-    """Per-stage pheromone edges from the re-run of this mission, after checking the re-run planned the same routes."""
     path = f"{PHEROMONE}/{run_name(rec['setting'], rec['strategy'], rec['seed'], rec['drones'])}.pkl"
     if rec["setting"] != "tuned" or not os.path.exists(path):
         return None
@@ -90,9 +77,6 @@ def load_pheromone(rec):
 
 
 def export_run(rec):
-    """Points are stored once; stages hold [point, staleness*20] pairs; trips hold [point, arrival s] pairs
-    (drones dwell `service` s at each point, which the site adds back). For the tuned ACO, stages also hold
-    pheromone edges as [from, to, tau/tau0*10] triples: `pc` right after the change, `pp` after the replan."""
     table, index = [], {}
     stages, trips = [], defaultdict(list)
 
@@ -123,7 +107,6 @@ def export_run(rec):
                        "front": r["true_front_points"], "map_over": r["map_overdue_count"],
                        "changed": round(r["affected_union_fraction"], 3), "snap": bool(r["snapshot_delivered"])})
         if ph:
-            # the site shows the pheromone kept from the previous plan (right after the change)
             if ph[k_stage]["ph_change"] is not None:
                 stages[-1]["pc"] = edges(ph[k_stage]["ph_change"])
         for k, ((x, y), route) in enumerate(zip(st["drones"], st["routes"])):

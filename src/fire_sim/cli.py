@@ -90,7 +90,7 @@ def mission_command(config):
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("inspect", help="List source layers and year/fire IDs").add_argument("path")
     sub.add_parser("fire", help="Build the ground-truth fire").add_argument("config", help="TOML config file")

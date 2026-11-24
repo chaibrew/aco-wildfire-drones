@@ -216,25 +216,22 @@ class ACORouter:
         clock = np.full(nd, ctx.t0)
         cur = np.arange(nd)
         active = np.ones(nd, dtype=bool)
-        # last planned observation of each point, so ants avoid revisiting what they just saw
         reserved = ctx.last_seen.copy()
         tau = None if greedy else self._pheromone.tau
         limit = ctx.end + HORIZON_TOLERANCE_S
 
         while active.any():
-            # the drone that is free first chooses next
             d = int(np.argmin(np.where(active, clock, np.inf)))
             i = int(cur[d])
             arrive = clock[d] + (ctx.dist[i, nd:] / ctx.speed[d] + ctx.service)
             feasible = (arrive <= limit) & (arrive > clock[d])
             if i >= nd:
-                feasible[i - nd] = False  # no immediate repeat of the same point
+                feasible[i - nd] = False
             cand = np.flatnonzero(feasible)
             if cand.size == 0:
                 active[d] = False
                 continue
             nodes = cand + nd
-            # how overdue each candidate would be on arrival, relative to its revisit period
             urgency = np.maximum(0.0, arrive[cand] - reserved[nodes]) / ctx.q[nodes]
             w = ctx.weight[i, nodes] * (p.urgency_floor + urgency) ** p.urgency_weight
             if greedy:
@@ -252,7 +249,7 @@ class ACORouter:
             routes[d].append(j)
             clock[d] = arrive[cand[pick]]
             cur[d] = j
-            seen = ctx.cover[j - nd]  # one visit also observes nearby points
+            seen = ctx.cover[j - nd]
             reserved[seen] = np.maximum(reserved[seen], clock[d])
         return routes
 
@@ -265,6 +262,5 @@ class ACORouter:
             if r.size:
                 pher.deposit(r, c, p.deposit_q / max(m.cost, COST_EPS))
         if p.use_bounds:
-            # mmas floor: without it unused edges decay to ~0 and urgent points become unreachable
             tau_max = p.n_ants * p.deposit_q / (max(p.rho, 1e-12) * max(best_cost, COST_EPS))
             pher.clip(tau_max * p.tau_min_ratio, tau_max)

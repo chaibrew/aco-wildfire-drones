@@ -78,12 +78,11 @@ Paired by `(scenario, trial, fraction, locality)`, all metrics lower-is-better. 
 * **J saturates.** With a 600 s horizon, any risk-3 point (q = 300 s) that is not reached gives J >= 1 and the
   max hides everything else. Report `margin`, `total_overdue` and `overdue_count` next to J. The ACO router
   already ranks plans with `margin`, then `total_overdue`.
-* **VNS at equal budget.** With 150 evaluations on about 137 points, VNS barely improves on its greedy start.
-  On tiny instances (4 points, 2 drones, 1200 evaluations) it matches the exhaustive optimum on `margin`
-  in 15/15 and is within about 2% on `total_overdue` (11/15 exactly optimal). Say so in the report, and
-  consider a second, larger VNS budget as a sensitivity check.
+* **VNS at equal budget.** VNS gets 1,200 evaluations, the same as ACO. On tiny instances (4 points,
+  2 drones, 1,200 evaluations) it matches the exhaustive optimum on `margin` in 15 of 15 instances. On
+  `total_overdue` it matches in 10 of 15 and is 2–17 % worse in the other 5.
 * **The change is instantaneous.** `S1` has the same time and drone positions as `S0`; only the points differ.
   This isolates the pheromone question, but it is not the same as the mission replay, where drones move and
   changes arrive with 12-hour snapshots. `scripts/aco_experiment.py` is the replay.
-* **No multiple-comparison correction.** The tables show many cells; treat p-values as descriptive.
+* **Multiple comparisons.** The analysis gives raw and Holm-adjusted p-values. The report uses the Holm values.
 * **`runtime_s` with `--workers > 1`** is only comparable within one run.

@@ -41,7 +41,6 @@ class PheromoneMatrix:
         return float(self.tau[self.index[a], self.index[b]])
 
     def remapped(self, new_keys: Sequence[Hashable], tau0: float) -> "PheromoneMatrix":
-        # carry tau across by point id; new edges start at tau0, removed ones are dropped
         new = PheromoneMatrix(new_keys, tau0)
         shared_new, shared_old = [], []
         for i, key in enumerate(new.keys):

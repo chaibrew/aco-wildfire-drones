@@ -15,7 +15,6 @@ for r in rows:
 
 
 def paired(drones, pairs, m, label, ref_name, other_name):
-    """pairs: (reference planner, other planner) pairs whose seeds are matched and pooled."""
     matched = [(runs[(drones, a)][s], runs[(drones, b)][s]) for a, b in pairs
                if (drones, a) in runs and (drones, b) in runs for s in sorted(set(runs[(drones, a)]) & set(runs[(drones, b)]))]
     if not matched:

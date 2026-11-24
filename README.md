@@ -1,8 +1,8 @@
 # aco-wildfire-drones
 
-ACO routing for wildfire-monitoring drones (COMP3821). This project compares different pheromone strategies when the fire perimeter changes.
+ACO routing for wildfire-monitoring drones (COMP3821, Group 17). The project compares four pheromone strategies when the fire perimeter changes: retention, fast evaporation, selective reset and full reset. Greedy and VNS are the baselines.
 
-See it in action! (recommend viewing on desktop): [aco-wildfire-drones.vercel.app](https://aco-wildfire-drones.vercel.app)
+Demo site (use a desktop browser): [aco-wildfire-drones.vercel.app](https://aco-wildfire-drones.vercel.app)
 
 ## Setup
 
@@ -16,9 +16,57 @@ python -m pip install --no-deps -e .
 pytest -q
 ```
 
+The tests do not use the network. 169 tests pass.
+
+## Repository
+
+| Folder | Contents |
+| --- | --- |
+| `src/fire_sim` | Ground-truth fire, drone mission and planning state |
+| `src/aco_router` | ACO planner and the four pheromone strategies. The parameters are in `config.py`. |
+| `src/baselines` | Greedy and VNS |
+| `src/experiment` | Controlled-change experiment and statistics |
+| `src/tuning` | F-Race and iterated race |
+| `scripts` | Commands that run the experiments and make the tables |
+| `outputs`, `results` | Result files that the report uses |
+| `docs` | Model and method details |
+| `site` | Demo site. Refer to [site/README.md](site/README.md). |
+
+## Reproduce the report
+
+Run each command from the repository root. Each command writes its files to `outputs/`.
+
+| Report section | Command | Result files in the repository |
+| --- | --- | --- |
+| Tuning (3.3.4, Appendix A) | Refer to [docs/tuning.md](docs/tuning.md), section 8 | Tables in `docs/tuning.md` |
+| Controlled change, main run (6.1) | `scripts/controlled_change_rerun.sh tuned` | `results/cc_tuned_rho01_results.zip` |
+| Controlled change, baselines (6.1) | `scripts/controlled_change_rerun.sh baselines` | `outputs/cc/camp_rho01_baselines.csv` |
+| Controlled change, before tuning (6.3) | `scripts/controlled_change_rerun.sh untuned` | `cc/camp_untuned_cycle.csv` in `results/cc_mission_results.zip` |
+| 24 h replay (6.2) | `python scripts/run_tuned_missions.py outputs/tuning_missions_d10 --baselines` | `outputs/tuning_missions_d10/` |
+
+To get the statistics:
+
+```sh
+python scripts/analyse_change_experiment.py outputs/cc/camp_tuned_rho01_cycle.csv
+python scripts/analyse_tuned_missions.py outputs/tuning_missions_d10
+```
+
+To compare greedy and VNS with full reset, join the two controlled-change files first:
+
+```sh
+(cat outputs/cc/camp_tuned_rho01_cycle.csv; tail -n +2 outputs/cc/camp_rho01_baselines.csv) > outputs/cc/camp_all.csv
+python scripts/analyse_change_experiment.py outputs/cc/camp_all.csv --group all --no-interaction
+```
+
+All runs use fixed seeds. The controlled-change runs use seeds 5000–5009 and the replay uses seeds 0–9. The tuning seeds do not overlap them.
+
+## Known issue
+
+`SpreadModel.length_to_breadth` in `src/fire_sim/spread.py` converts the wind speed to mph before it applies the Anderson (1983) formula. The formula expects m/s. Thus the fire is too long and narrow in strong wind. All results in the report use this code. The bug changes the ground-truth fire, and all planners fly the same fire. The report gives the effect.
+
 ## Data
 
-The repository contains the FEDS 2018 GeoPackage (`data/raw/`) and the weather and elevation for the tested fires (`data/cache/weather/`, `data/cache/dem/`). For another year, download it:
+The repository contains the FEDS 2018 GeoPackage (`data/raw/`) and the weather and elevation for the tested fires (`data/cache/`). For another year, download it:
 
 ```sh
 python scripts/fetch_feds.py --year 2019
@@ -27,34 +75,32 @@ fire-sim inspect data/raw/LargeFires_2019.gpkg
 
 ## Ground-truth fire
 
-FEDS tracks fire perimeters at 12 hour intervals. `fire-sim fire` makes a continuous fire by interpolating between 2 12-hour timestamp pairs with augmentation with weather/terrain data to try to make it somewhat realistic.
+FEDS gives a fire perimeter each 12 hours. `fire-sim fire` makes a continuous fire between these perimeters.
 
-- At each FEDS observation time, the fire perimeter is exactly the same as the FEDS perimeter.
-- Between observations, wind, slope and hourly fire weather control the spread.
+- At each FEDS time, the fire is the same as the FEDS perimeter.
+- Between FEDS times, wind, slope and hourly fire weather control the spread.
 - The command downloads weather (Open-Meteo, ERA5) and elevation (Copernicus GLO-30) one time for each fire. It keeps them in `data/cache/`.
 
 ```sh
 fire-sim fire configs/camp-3885.toml
 ```
 
-Output in `[output] fire_dir`: `field.npz` and `field.json` (the fire), `fire.png`, `fire.gif` (if `gif = true`), `validation.csv` (if `validate = true`), and a copy of the config.
+The output is in `[output] fire_dir`: `field.npz` and `field.json` (the fire), `fire.png`, `fire.gif` (if `gif = true`), `validation.csv` (if `validate = true`) and a copy of the config.
 
 ## Drone mission
 
 `fire-sim mission` flies drones above the ground-truth fire. The planner does not see the ground truth. The planner sees:
 
 - The most recent FEDS perimeter. A new perimeter arrives each 12 hours.
-- Drone observations. When a drone completes an observation, it sees the true fire in its sensor radius.
+- Drone observations. A drone sees the true fire in its sensor radius.
 
 The monitoring points are the grid cells on the mapped perimeter. The risk of a point comes from the observed spread rate. The planner objective is J on the fleet map.
-
-The mission runs in 12-hour blocks. A block starts at one FEDS snapshot and ends at the next. At the end of a block, the next snapshot first scores the fleet map. Then the planner receives it as the start of the next block.
 
 ```sh
 fire-sim mission configs/camp-3885.toml
 ```
 
-Output in `[output] mission_dir`: `metrics.csv` (one row for each stage), `blocks.csv` (one row for each 12-hour block, with the snapshot score), `run.json` (the full config and the fire provenance), `mission.png`, `mission.gif` (if `gif = true`), and a copy of the config.
+The output is in `[output] mission_dir`: `metrics.csv` (one row for each stage), `blocks.csv` (one row for each 12-hour block), `run.json`, `mission.png`, `mission.gif` (if `gif = true`) and a copy of the config.
 
 ## Configuration
 
@@ -86,36 +132,16 @@ Both commands read one TOML file. Copy [configs/camp-3885.toml](configs/camp-388
 
 ## Connect a planner
 
-A planner is a function. It receives a `PlanningState` and returns `{drone_id: [cell_id, ...]}`. Use `evaluate(state, routes)` to calculate J for a candidate. Refer to [the simulation contract](docs/simulation-contract.md) and [scripts/continuous_example.py](scripts/continuous_example.py).
+A planner is a function. It receives a `PlanningState` and returns `{drone_id: [cell_id, ...]}`. Use `evaluate(state, routes)` to calculate J for a plan. Refer to [docs/simulation-contract.md](docs/simulation-contract.md) and [scripts/continuous_example.py](scripts/continuous_example.py).
 
 `smoke_router` only tests the pipeline. It is not a baseline.
 
-## ACO router
+## Documents
 
-`src/aco_router` is the ACO planner with the four pheromone strategies: retention, fast evaporation, selective reset and full reset. `FireSimRouter` connects it to `run_mission`. It scores each candidate plan with `evaluate` and moves pheromone by `CellId`.
-## ACO router
-`src/aco_router` is the ACO planner with the four pheromone strategies: retention, fast evaporation, selective reset and full reset. `FireSimRouter` connects it to `run_mission`. It scores each candidate plan with `evaluate` and moves pheromone by `CellId`.
-
-The experiment needs a FEDS Largefire GeoPackage ([Largefire archive](https://figshare.com/articles/dataset/Largefire_tar_gz/19170071/1), years 2012–2020) in `data/raw/`. `python scripts/fetch_feds.py --year 2018` downloads one. The defaults are `LargeFires_2018.gpkg` and fire 3885 (the Camp Fire). To use a different file or fire, add `--gpkg`, `--year` and `--fire-id`. The first run for a new fire downloads its weather and elevation into `data/cache/`.
-
-- `aco_experiment.py` flies `smoke_router` and the four ACO strategies over the Camp Fire (fire 3885, first 24 h, 144 replans of 10 minutes) for 10 seeds. Each seed changes the fire between snapshots and the random choices of the ACO. The script writes one row for each run, with map J, true-front J and overdue counts. It takes approximately 30 to 60 minutes.
-- `--help` shows the config options (fire, snapshots, hours, seeds, drones, ACO budget).
-- `aco_analyse.py` reads that CSV and compares each strategy with `smoke_router` on the same seed. For each metric it gives the mean difference, a paired t statistic and the number of seeds that each strategy won.
-
-For example, the commands below run the tests, then runs `smoke_router` and the four ACO strategies with 6 drones over 10 seeds, and writes the results to a file at `outputs/camp3885-6-drones.csv`. The last command compares each strategy with `smoke_router` on the same seed. For each metric it gives the mean difference, a paired t statistic (with 10 seeds, |t| > 2.26 means p < 0.05) and the number of seeds where the strategy was better.
-
-
-```sh
-python -m pytest -q
-python scripts/aco_experiment.py --drones 6 --out outputs/camp3885-6-drones.csv
-python scripts/aco_analyse.py outputs/camp3885-6-drones.csv
-```
-
-The ACO parameters are in `src/aco_router/config.py`.
-
-## Model details
-
-Refer to [docs/continuous-fire.md](docs/continuous-fire.md).
+- [docs/continuous-fire.md](docs/continuous-fire.md): fire model and validation
+- [docs/simulation-contract.md](docs/simulation-contract.md): planner interface
+- [docs/experiment-harness.md](docs/experiment-harness.md): baselines and controlled-change experiment
+- [docs/tuning.md](docs/tuning.md): parameter tuning
 
 ## Data sources
 
@@ -126,10 +152,3 @@ Refer to [docs/continuous-fire.md](docs/continuous-fire.md).
 - [Copernicus GLO-30 DEM](https://registry.opendata.aws/copernicus-dem/)
 
 The loader uses the `perimeter` layer of the published 2012–2020 schema. Other FEDS releases can have different field names.
-
-
-## Baselines and controlled-change experiments
-
-Greedy and VNS planners (`src/baselines`) and the paired controlled-change experiment (`src/experiment`,
-`scripts/run_change_experiment.py`, `scripts/analyse_change_experiment.py`) are described in
-[docs/experiment-harness.md](docs/experiment-harness.md).

@@ -1,20 +1,3 @@
-"""Full-mission replay of the baseline planners, with every replanning stage saved.
-
-`scripts/aco_experiment.py` keeps only one summary row per mission, so a single odd stage (for
-example "stage 40") cannot be inspected afterwards.  This module runs the same missions but
-writes every stage to stages.csv, tagged with planner, drone count and seed, plus one summary row
-per mission to summary.csv.  It then provides tools to look at a stage in detail
-(`stage_report`) and to scan for stages that jump away from their neighbours (`scan_anomalies`).
-
-Design notes
-------------
-* The seed fixes the ground-truth fire noise (and VNS's random generator), and the same seed gives
-  every planner and every drone count the same fire, so results are paired by seed.
-* Greedy is deterministic.  VNS gets `vns_evaluations` plan evaluations per replan; the default in
-  the scripts is ants * iterations, the same budget unit the ACO router uses.
-* Missions are written one at a time and `resume=True` skips missions already in summary.csv.
-  Stage rows of a mission that crashed before its summary row was written are dropped on resume.
-"""
 from __future__ import annotations
 
 import csv
@@ -32,14 +15,10 @@ INT_COLUMNS = {"drones", "seed", "stage", "block"}
 
 
 def baseline_planners(vns_evaluations: int) -> dict:
-    """{name: factory(seed) -> router} for the two baselines."""
     return {"greedy": lambda seed: GreedyRouter(),
             "vns": lambda seed: VNSRouter(VNSParams(max_evaluations=vns_evaluations), seed=seed)}
 
 
-# --------------------------------------------------------------------------- #
-# Running
-# --------------------------------------------------------------------------- #
 def _append(path: Path, rows: list[dict]):
     if not rows:
         return
@@ -60,7 +39,6 @@ def _done(summary_csv: Path) -> set:
 
 
 def _drop_incomplete(stages_csv: Path, keep: set):
-    """Remove stage rows whose mission has no summary row (a run that stopped part-way)."""
     if not stages_csv.exists():
         return 0
     with stages_csv.open(newline="") as stream:
@@ -78,7 +56,6 @@ def _drop_incomplete(stages_csv: Path, keep: set):
 
 def run_replay(field_for_seed, planners: dict, drone_counts, seeds, hours: float, out_dir, *,
                cell_size_m: float = 1000.0, horizon_s: float = 600, resume: bool = False, log=print):
-    """Fly each planner at each drone count on each seed's fire for `hours` hours."""
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     stages_csv, summary_csv = out / "stages.csv", out / "summary.csv"
@@ -97,7 +74,7 @@ def run_replay(field_for_seed, planners: dict, drone_counts, seeds, hours: float
         todo = [(d, n) for d in drone_counts for n in planners if (n, d, seed) not in done]
         if not todo:
             continue
-        field = field_for_seed(seed)                      # one fire per seed, shared by every run
+        field = field_for_seed(seed)
         for drones, name in todo:
             config = MissionConfig(cell_size_m=cell_size_m, drones=drones, horizon_s=horizon_s)
             started = time.time()
@@ -111,9 +88,6 @@ def run_replay(field_for_seed, planners: dict, drone_counts, seeds, hours: float
     return {"stages": stages_csv, "summary": summary_csv}
 
 
-# --------------------------------------------------------------------------- #
-# Looking at stages
-# --------------------------------------------------------------------------- #
 def load_stages(path) -> list[dict]:
     rows = []
     with Path(path).open(newline="") as stream:
@@ -134,7 +108,6 @@ def load_stages(path) -> list[dict]:
 
 
 def _series(rows, drones, planner, metric):
-    """{stage: [values across seeds]} for one (drones, planner)."""
     out = defaultdict(list)
     for r in rows:
         if r["drones"] == drones and r["planner"] == planner:
@@ -143,14 +116,6 @@ def _series(rows, drones, planner, metric):
 
 
 def stage_report(rows, stage: int, window: int = 3, metric: str = "true_objective") -> list[dict]:
-    """For every (drones, planner), compare `stage` with the stages around it.
-
-    Reported per run group: the median `metric` at the stage, the median over the neighbouring
-    stages (stage-window .. stage+window, excluding the stage itself), their difference, how many
-    seeds peak at this stage, the seed with the largest value, and how many seeds received a new
-    satellite snapshot at this stage.  If all seeds peak here and a snapshot arrives, the anomaly
-    is systematic (tied to the data); if one seed dominates, it is a single-run outlier.
-    """
     out = []
     for drones, planner in sorted({(r["drones"], r["planner"]) for r in rows}):
         series = _series(rows, drones, planner, metric)
@@ -164,7 +129,7 @@ def stage_report(rows, stage: int, window: int = 3, metric: str = "true_objectiv
         for seed in per_seed:
             others = [r[metric] for r in rows if r["drones"] == drones and r["planner"] == planner
                       and r["seed"] == seed and 0 < abs(r["stage"] - stage) <= window]
-            peaks += bool(others) and per_seed[seed][metric] > max(others)   # strictly higher than all neighbours
+            peaks += bool(others) and per_seed[seed][metric] > max(others)
         top = max(per_seed.items(), key=lambda kv: kv[1][metric])
         at = statistics.median(series[stage])
         around = statistics.median(neighbours) if neighbours else float("nan")
@@ -182,12 +147,6 @@ def stage_report(rows, stage: int, window: int = 3, metric: str = "true_objectiv
 
 
 def scan_anomalies(rows, metric: str = "true_objective", threshold: float = 4.0, top: int = 5) -> list[dict]:
-    """Find stages whose median `metric` jumps unusually far from the previous stage.
-
-    For each (drones, planner) the series of per-stage medians across seeds is differenced and a
-    robust z-score  (diff - median(diffs)) / (1.4826 * MAD(diffs))  is computed.  Stages with
-    |z| >= threshold are returned, largest first.  Constant series are skipped.
-    """
     found = []
     for drones, planner in sorted({(r["drones"], r["planner"]) for r in rows}):
         series = _series(rows, drones, planner, metric)

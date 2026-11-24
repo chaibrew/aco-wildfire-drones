@@ -31,7 +31,7 @@ export default function ExploreView() {
   const [frac, setFrac] = useState(+(params.get("f") ?? 0.2));
   const [loc, setLoc] = useState(params.get("loc") ?? "concentrated");
   const [stage, setStage] = useState(+(params.get("st") ?? 40));
-  const setting = "tuned"; // the site shows the tuned ACO only
+  const setting = "tuned";
   const [planner, setPlanner] = useState(params.get("p") ?? "aco_selective_reset");
   const [phase, setPhase] = useState<Phase>((params.get("ph") as Phase) ?? "change");
   const [metric, setMetric] = useState<Metric>((params.get("m") as Metric) ?? "total_overdue");

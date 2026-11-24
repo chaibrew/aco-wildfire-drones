@@ -39,6 +39,8 @@ The cost of a step is length divided by rate. The rate has three parts:
 | Slope | `1 + 21 tan^2(slope)` uphill. 1 downhill. 21 = 5.275 β^-0.3, β = 0.01. | Rothermel (1972) |
 | Variation | Random log-normal factor, σ = 0.3, correlation length 500 m. The seed controls it. | — |
 
+Known issue: `SpreadModel.length_to_breadth` converts the midflame wind to mph before it applies the Anderson (1983) formula. The formula expects m/s. Thus the ellipse is too long and narrow in strong wind. All results in the report use this code.
+
 ### Pacing
 
 `pace_k` changes the fraction of the spread into clock time. It uses the cumulative sum of `FFWI + 1`. FFWI is the Fosberg Fire Weather Index (Fosberg 1978). The simulation calculates FFWI each hour from the temperature, humidity and wind at the fire centre (Open-Meteo, ERA5).

@@ -4,7 +4,6 @@
   --background: #ffffff;
   --foreground: #171717;
   
-  /* Design system colours from the template */
   --ds-background-100: #ffffff;
   --ds-background-200: #fafafa;
   --ds-gray-100: #f5f5f5;
@@ -39,22 +38,18 @@
   --ds-amber-800: #f59e0b;
   --ds-orange-600: #ea580c;
 
-  /* planners */
   --p-retention: #2563eb;
   --p-full_reset: #d9480f;
   --p-fast_evaporation: #a21caf;
   --p-selective_reset: #0f766e;
   --p-greedy: #404040;
   --p-vns: #a3a3a3;
-  /* compared planners A and B */
   --side-a: #6d28d9;
   --side-b: #0e7490;
-  /* staleness bins: fine (grey), due soon, overdue, missed */
   --st-0: #a3a3a3;
   --st-1: #ca8a04;
   --st-2: #ea580c;
   --st-3: #b91c1c;
-  /* map */
   --fire: #ea580c;
   --pheromone: #f59e0b;
   --terrain: #737373;
@@ -135,7 +130,6 @@ body {
   color: var(--ds-gray-1000);
 }
 
-/* overdue monitoring points pulse, like the request dots on the template map */
 @keyframes pixel-pulse {
   0%, 100% { opacity: 0.85; transform: scale(1); }
   50% { opacity: 1; transform: scale(1.5); }
@@ -149,7 +143,6 @@ body {
   .pixel-pulse { animation: none; }
 }
 
-/* range input in the template's flat style */
 input[type="range"].range {
   -webkit-appearance: none;
   appearance: none;

@@ -1,18 +1,3 @@
-"""Analyse a stages.csv from mission_replay.py: VNS vs Greedy per drone count, plus a stage check.
-
-    python scripts/analyse_replay.py outputs/replay-24h --stage 40
-
-Method
-------
-* The independent unit is the SEED (stages inside one mission are strongly correlated), so each seed's
-  stages are averaged first and the planners are compared with a paired difference over seeds.
-* Difference = vns - greedy; every metric here is lower-is-better, so a NEGATIVE difference favours VNS.
-* The 95% interval is a paired-t interval.  With few seeds the interval is wide and the smallest possible
-  two-sided Wilcoxon p-value is 2/2^n (0.0625 for 5 seeds), so p < 0.05 is impossible below 6 seeds:
-  read the interval and the win count, not the p-value.
-* `true_objective` is also reported on the subset of stages where the whole true fire front is on the
-  planner's map, because otherwise it is dominated by unmapped points that no planner can visit.
-"""
 import argparse
 import math
 import statistics
@@ -55,7 +40,7 @@ def paired(a, b):
 
 
 def main():
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser()
     ap.add_argument("results_dir")
     ap.add_argument("--stage", type=int, default=None)
     ap.add_argument("--window", type=int, default=3)

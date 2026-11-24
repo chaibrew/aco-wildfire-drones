@@ -171,7 +171,6 @@ class Metrics:
 
     @property
     def score(self) -> tuple[float, float, float]:
-        # lower is better; total overdue still ranks plans when every plan has the same j
         return (self.margin, self.total_overdue, self.total_distance_m)
 
     @property

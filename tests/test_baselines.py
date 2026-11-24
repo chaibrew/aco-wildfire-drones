@@ -42,7 +42,7 @@ def test_greedy_is_feasible_deterministic_and_covers_every_drone_key():
         a = GreedyRouter()(st)
         assert a == GreedyRouter()(st)
         assert set(a) == {d.id for d in st.drones}
-        fs.evaluate(st, a)  # raises if a route exceeds the horizon or names an inactive point
+        fs.evaluate(st, a)
 
 
 def test_greedy_routes_are_maximal_nothing_else_fits():
@@ -97,12 +97,6 @@ def test_vns_handles_empty_and_single_point_states():
 
 
 def test_vns_is_near_optimal_on_tiny_instances():
-    """Equal budget to the ACO exhaustive test (1200 evaluations).
-
-    VNS must match the exhaustive optimum on the primary criterion (margin) every time and stay
-    within a few percent on the secondary one (total overdue). It is a heuristic: it does not
-    always find the exact optimum (about 11 of 15 here), and the report should say so.
-    """
     gaps = []
     for seed in range(15):
         st = tiny_state(seed)
@@ -118,7 +112,7 @@ def test_vns_is_near_optimal_on_tiny_instances():
 def test_vns_stops_when_the_search_space_is_exhausted_instead_of_spinning():
     st = tiny_state(0)
     vns = VNSRouter(VNSParams(max_evaluations=10**7, patience=30), seed=0)
-    vns(st)  # must return; the space has ~3e4 plans, far fewer than 1e7 evaluations
+    vns(st)
     assert vns.results[0].evaluations < 10**7
 
 
@@ -128,4 +122,4 @@ def test_baselines_run_inside_the_environment_loop_for_many_stages():
     greedy = GreedyRouter()
     for stage in range(6):
         st = env.state(600.0)
-        env.step((vns if stage % 2 else greedy)(st), 600.0)  # step() raises on any rule violation
+        env.step((vns if stage % 2 else greedy)(st), 600.0)

@@ -248,7 +248,6 @@ export function MetricRow({ label, value, sub, color, active, onClick }: {
   );
 }
 
-/** Large headline number, as "Total requests" on the template. */
 export function BigStat({ label, value, sub }: { label: ReactNode; value: ReactNode; sub?: ReactNode }) {
   return (
     <div className="space-y-2">
@@ -259,7 +258,6 @@ export function BigStat({ label, value, sub }: { label: ReactNode; value: ReactN
   );
 }
 
-/** Coloured key rows, as "Top countries by requests" on the template. */
 export function KeyList({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
     <div className="space-y-2">
@@ -287,7 +285,6 @@ export function KeyRow({ color, code, value, sub, active, onClick, title }: {
   );
 }
 
-/** Small "▲ count + label" line from the template. */
 export function CountLine({ value, label }: { value: ReactNode; label: ReactNode }) {
   return (
     <div className="flex items-baseline w-full md:w-fit justify-start mt-2">

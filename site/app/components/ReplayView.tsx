@@ -11,13 +11,11 @@ import { Field, Seg, Select, Toggle } from "./Controls";
 
 const SPEEDS = [{ value: 2, label: "2 min/s" }, { value: 10, label: "10 min/s" }, { value: 30, label: "30 min/s" }, { value: 60, label: "1 h/s" }, { value: 120, label: "2 h/s" }];
 const DAY = 86400;
-/** The replay shows one recorded mission (seed 0); the means card still averages all 10 seeds. */
 const SEED = 0;
 const CENTER: XY = [-0.9, -2];
 const SPAN = 27;
 const AXIS = { fill: "var(--ds-gray-900)", fontSize: 11, fontFamily: "var(--font-geist-mono)" };
 
-/* Mission clock shared by the maps (redrawn every frame) and the rest of the page (updated ~10 times a second). */
 function createClock(t0: number) {
   let t = t0;
   const subs = new Set<() => void>();
@@ -29,7 +27,6 @@ function createClock(t0: number) {
 }
 type Clock = ReturnType<typeof createClock>;
 
-/** Compact planner name for the key rows. */
 const compact = (k: string) => PLANNER[strategyOf(k)].short;
 const order = (k: string) => (PLANNER[k] ? 1 : 0) * 10 + Object.keys(PLANNER).indexOf(strategyOf(k));
 
@@ -37,7 +34,6 @@ type PhMode = "on" | "off";
 const PH_MODES = [{ value: "on" as const, label: "On" }, { value: "off" as const, label: "Off" }];
 const isACO = (run: Run) => run.stages.some((s) => s.pc);
 
-/** Pheromone edges for the current stage, drawn under the points: wider and darker = more pheromone relative to tau0. */
 function PheromoneLayer({ run, k, mode, color, proj }: { run: Run; k: number; mode: PhMode; color: string; proj: Proj }) {
   const edges = useMemo(() => (mode === "off" ? null : stagePheromone(run, k)), [run, k, mode]);
   if (!edges?.length) return null;
@@ -53,7 +49,6 @@ function PheromoneLayer({ run, k, mode, color, proj }: { run: Run; k: number; mo
   );
 }
 
-/** Direction of travel at time t: the last movement before t, or the next one while hovering over a point. */
 function droneHeading(trip: Run["trips"][number], t: number) {
   const now = dronePos(trip, t);
   if (!now) return 0;
@@ -112,7 +107,6 @@ export default function ReplayView() {
   const index = useJSON<Index>("/data/index.json");
   const [drones, setDrones] = useState(+(params.get("d") ?? 10));
   const seed = SEED;
-  // older links may name untuned planners; the site shows the tuned ACO only
   const asShown = (k: string) => k.replace(/^untuned_/, "tuned_");
   const [a, setA] = useState(asShown(params.get("a") ?? "tuned_retention"));
   const [b, setB] = useState(asShown(params.get("b") && params.get("b") !== "none" ? params.get("b")! : "tuned_full_reset"));

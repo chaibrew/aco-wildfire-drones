@@ -1,9 +1,3 @@
-"""Paired analysis of scripts/run_change_experiment.py output.
-
-  python scripts/analyse_change_experiment.py outputs/change_synthetic.csv
-  python scripts/analyse_change_experiment.py outputs/change_synthetic.csv --metric total_overdue \
-      --reference aco_retention --group locality
-"""
 import argparse
 import os
 import sys
@@ -16,7 +10,7 @@ from experiment.stats import (GROUPINGS, METRICS, change_interaction, format_int
 
 
 def main():
-    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = argparse.ArgumentParser()
     p.add_argument("csv")
     p.add_argument("--metric", nargs="+", default=["margin", "total_overdue", "overdue_count"], choices=METRICS)
     p.add_argument("--reference", default="aco_full_reset", help="planner the others are compared with")

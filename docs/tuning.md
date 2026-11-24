@@ -188,7 +188,7 @@ The values below are now the defaults in `src/aco_router/config.py` and are save
 | ε | 0.05 | 0.12 |
 | ρ_high, k | 0.5, 10 | 0.5, 10 (unchanged) |
 
-`scripts/aco_experiment.py`, `scripts/run_change_experiment.py` and `ExperimentConfig` now default to 20 ants × 60 iterations, and both scripts accept `--params FILE.json` to run any other setting (for example the untuned one). All 147 tests pass with the tuned defaults, including the brute-force optimality test.
+`scripts/aco_experiment.py`, `scripts/run_change_experiment.py` and `ExperimentConfig` now default to 20 ants × 60 iterations, and both scripts accept `--params FILE.json` to run any other setting (for example the untuned one). All 169 tests pass with the tuned defaults, including the brute-force optimality test.
 
 ## 7. Findings to report
 

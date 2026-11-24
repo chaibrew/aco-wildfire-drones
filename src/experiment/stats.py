@@ -1,20 +1,3 @@
-"""Paired analysis of a results CSV written by the controlled-change runner.
-
-Pairing: rows with the same (scenario, trial, target_fraction, locality) share the base
-scenario, the change, the pre-change pheromone and the RNG seed, so each planner is
-compared with the reference on the *same* trial. All metrics are "lower is better".
-
-Independent unit.  One trial is one base scenario (`synthetic_state(seed)`, or one captured FEDS
-state with its own change draw).  The SAME trial is reused for every target fraction and both
-localities, so rows that share (scenario, trial) are NOT independent.  Whenever a grouping pools
-several rows per trial (`locality`, `fraction`, `all`), the paired differences are first averaged
-within each (scenario, trial) cluster and the confidence interval and p-values use one number per
-cluster.  Note `scenario` is only a label (e.g. "synthetic") so the cluster key is the pair
-(scenario, trial); using `scenario` alone would collapse a whole run into a single cluster.
-
-Sign convention for differences and interactions: planner minus reference, lower is better, so a
-NEGATIVE value means the planner is better.
-"""
 from __future__ import annotations
 
 import csv
@@ -22,7 +5,7 @@ import math
 import statistics
 from collections import defaultdict
 
-try:  # scipy is a dependency of fire_sim; guard anyway so the module imports without it
+try:
     from scipy import stats as _sps
 except Exception:  # pragma: no cover
     _sps = None
@@ -72,7 +55,6 @@ def _p_values(diffs: list[float]) -> tuple[float, float]:
 
 
 def holm_adjust(p_values: list[float]) -> list[float]:
-    """Holm-Bonferroni adjusted p-values, in the original order. NaN stays NaN and is not counted."""
     adjusted = [float("nan")] * len(p_values)
     valid = sorted(((i, p) for i, p in enumerate(p_values) if math.isfinite(p)), key=lambda t: t[1])
     m, running = len(valid), 0.0
@@ -84,7 +66,7 @@ def holm_adjust(p_values: list[float]) -> list[float]:
 
 def paired_summary(rows: list[dict], metric: str, reference: str, grouping: str = "cell") -> list[dict]:
     keys = GROUPINGS[grouping]
-    cell_rows = defaultdict(lambda: defaultdict(dict))  # group -> planner -> pair id -> value
+    cell_rows = defaultdict(lambda: defaultdict(dict))
     for r in rows:
         group = tuple(r[k] for k in keys)
         pair = (r["scenario"], r["trial"], r["target_fraction"], r["locality"])
@@ -102,8 +84,6 @@ def paired_summary(rows: list[dict], metric: str, reference: str, grouping: str 
                    "median": statistics.median(xs), "sd": statistics.stdev(xs) if len(xs) > 1 else 0.0}
             if planner != reference and ref:
                 pairs = [p for p in vals if p in ref]
-                # pair = (scenario, trial, target_fraction, locality). Average the paired differences within
-                # each independent (scenario, trial) cluster before doing any inference.
                 by_cluster = defaultdict(list)
                 for p in pairs:
                     by_cluster[(p[0], p[1])].append(vals[p] - ref[p])
@@ -116,7 +96,6 @@ def paired_summary(rows: list[dict], metric: str, reference: str, grouping: str 
                            better=sum(d < 0 for d in diffs), tied=sum(d == 0 for d in diffs),
                            worse=sum(d > 0 for d in diffs))
             out.append(row)
-    # Holm correction across the planners compared with the reference inside each group.
     for group in {tuple(r.get(k) for k in keys) for r in out}:
         members = [r for r in out if tuple(r.get(k) for k in keys) == group and "t_p" in r]
         for field, adjusted in (("t_p_holm", holm_adjust([r["t_p"] for r in members])),
@@ -145,8 +124,7 @@ def format_summary(summary: list[dict], metric: str, reference: str, grouping: s
 
 
 def trace_summary(trace_rows: list[dict], checkpoints=(1, 10, 30, 60, 100, 150), value="best_margin") -> list[dict]:
-    """Median best-so-far value at fixed evaluation counts: the 'objective trace after a change'."""
-    runs = defaultdict(list)  # (planner, trial, fraction, locality) -> [(evals, value)]
+    runs = defaultdict(list)
     for r in trace_rows:
         if r.get("phase", "final") == "pilot":
             continue
@@ -171,19 +149,6 @@ def load_trace(path: str) -> list[dict]:
 def change_interaction(rows: list[dict], metric: str, planner: str = "aco_selective_reset",
                        reference: str = "aco_full_reset", factor: str = "locality",
                        fraction_split: float = 0.5) -> dict:
-    """Does `planner` do relatively better than `reference` under one kind of change than another?
-
-    This tests the project's research question directly.  For every (trial, fraction, locality) the
-    difference d = planner - reference is taken.  Within each independent (scenario, trial) cluster
-    the d values are averaged on each side of the factor:
-        factor="locality": concentrated (a) versus distributed (b)
-        factor="fraction": fraction <= fraction_split (a, small) versus > fraction_split (b, large)
-    and interaction = mean_d(a) - mean_d(b).  The distribution of per-cluster interactions is then
-    tested against zero.  NEGATIVE interaction: the planner's difference to the reference is lower
-    (better) under a than under b, e.g. selective reset gains more after concentrated/small changes.
-    Clusters that lack either side are skipped.  `fraction_split` defaults to 0.5, the same cut-off
-    the ACO router uses to call a change LOCAL (aco_router.config.LOCAL_CHANGE_MAX_FRACTION).
-    """
     if factor not in ("locality", "fraction"):
         raise ValueError("factor must be 'locality' or 'fraction'")
     values = defaultdict(dict)

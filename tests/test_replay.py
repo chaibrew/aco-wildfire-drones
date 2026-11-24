@@ -34,7 +34,7 @@ def test_every_planner_drone_count_and_seed_is_run_and_tagged(tmp_path):
         (p, d, s) for p in ("greedy", "vns") for d in (2, 3) for s in (0, 1)}
     with paths["summary"].open() as f:
         assert len(list(csv.DictReader(f))) == 8
-    assert len({r["stage"] for r in rows}) == 9      # 1.5 h of 600 s stages
+    assert len({r["stage"] for r in rows}) == 9
 
 
 def test_same_seed_gives_every_planner_the_same_fire(tmp_path):
@@ -54,8 +54,7 @@ def test_resume_skips_finished_missions_and_drops_unfinished_ones(tmp_path):
     paths = run(tmp_path, seeds=[0])
     n = len(load_stages(paths["stages"]))
     run(tmp_path, seeds=[0], resume=True)
-    assert len(load_stages(paths["stages"])) == n                      # nothing re-run, nothing duplicated
-    # simulate a crash: remove one finished mission's summary row, keep its stage rows
+    assert len(load_stages(paths["stages"])) == n
     lines = paths["summary"].read_text().splitlines()
     paths["summary"].write_text("\n".join(lines[:-1]) + "\n")
     run(tmp_path, seeds=[0], resume=True)
@@ -86,7 +85,7 @@ def test_stage_report_shows_a_systematic_spike_tied_to_a_snapshot():
 def test_stage_report_shows_a_single_seed_outlier():
     r = stage_report(fake_rows(spike_stage=6, spike_seed_only=2), stage=6, window=3)[0]
     assert r["seeds_peaking"] == 1 and r["top_seed"] == 2 and r["top_seed_share_of_sum"] > 0.6
-    assert r["difference"] < 2.0          # the median across seeds barely moves
+    assert r["difference"] < 2.0
 
 
 def test_scan_finds_the_spike_and_ignores_a_smooth_series():

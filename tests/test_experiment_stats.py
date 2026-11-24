@@ -1,4 +1,3 @@
-"""Tests for the clustered inference, Holm correction and interaction analysis in experiment.stats."""
 import csv
 import math
 import statistics
@@ -17,7 +16,6 @@ REF, SEL = "aco_full_reset", "aco_selective_reset"
 
 
 def make_rows(trials=6, scenarios=("synthetic",), gain_conc=0.0, gain_dist=0.0, jitter=True):
-    """Reference value per trial plus a planner whose gain depends on locality; noise is deterministic."""
     rows = []
     for si, scenario in enumerate(scenarios):
         for trial in range(trials):
@@ -40,9 +38,9 @@ def test_pooled_grouping_tests_one_value_per_trial_not_per_row():
     rows = make_rows(gain_conc=0.2, gain_dist=0.1)
     summary = paired_summary(rows, "margin", REF, "locality")
     out = sel_row([r for r in summary if r["locality"] == "concentrated"])
-    assert out["n_pairs"] == 6 * len(FRACTIONS)   # 18 rows ...
-    assert out["n_clusters"] == 6                 # ... but only 6 independent trials
-    diffs = []  # hand-computed: one mean difference per trial
+    assert out["n_pairs"] == 6 * len(FRACTIONS)
+    assert out["n_clusters"] == 6
+    diffs = []
     for trial in range(6):
         d = [a["margin"] - b["margin"] for a in rows for b in rows
              if a["planner"] == SEL and b["planner"] == REF and a["trial"] == b["trial"] == trial
@@ -79,7 +77,6 @@ def test_holm_adjust_known_values_and_nan_handling():
 
 def test_summary_rows_carry_holm_adjusted_p_values():
     rows = make_rows(gain_conc=0.3, gain_dist=0.3)
-    # add a second planner so there is a family of two comparisons
     extra = [{**r, "planner": "aco_retention", "margin": r["margin"] + 0.05 * (1 + r["trial"] % 3)}
              for r in rows if r["planner"] == SEL]
     out = [r for r in paired_summary(rows + extra, "margin", REF, "all") if "t_p" in r]
@@ -104,7 +101,6 @@ def test_interaction_reports_no_difference_when_gains_are_equal():
 def test_interaction_by_fraction_uses_the_split():
     rows = []
     for r in make_rows(gain_conc=0.0, gain_dist=0.0, jitter=True):
-        # planner gains 0.4 only when the change is small (fraction <= 0.4)
         if r["planner"] == SEL and r["target_fraction"] <= 0.4:
             r = {**r, "margin": r["margin"] - 0.4}
         rows.append(r)

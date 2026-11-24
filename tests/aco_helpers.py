@@ -3,7 +3,7 @@ import numpy as np
 from aco_router.config import ACOParams
 from aco_router.model import Drone, MissionInstance, Point
 
-REVISIT_S = (900.0, 450.0, 300.0)  # fire_sim: 900 / risk
+REVISIT_S = (900.0, 450.0, 300.0)
 
 
 def random_instance(seed: int, n_points: int = 6, n_drones: int = 2, time: float = 0.0, horizon: float = 600.0,

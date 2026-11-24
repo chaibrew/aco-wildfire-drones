@@ -20,7 +20,7 @@ rows = list(csv.DictReader(open(sys.argv[1])))
 by: dict[str, dict[int, dict]] = {}
 for r in rows:
     by.setdefault(r["planner"], {})[int(r["seed"])] = r
-baseline = sys.argv[2] if len(sys.argv) > 2 else "greedy"  # e.g. smoke_router, vns, aco_full_reset
+baseline = sys.argv[2] if len(sys.argv) > 2 else "greedy"
 base = by[baseline]
 diff_label = f"diff vs {baseline}"
 seeds = sorted(base)
