@@ -60,10 +60,6 @@ python scripts/analyse_change_experiment.py outputs/cc/camp_all.csv --group all 
 
 All runs use fixed seeds. The controlled-change runs use seeds 5000–5009 and the replay uses seeds 0–9. The tuning seeds do not overlap them.
 
-## Known issue
-
-`SpreadModel.length_to_breadth` in `src/fire_sim/spread.py` converts the wind speed to mph before it applies the Anderson (1983) formula. The formula expects m/s. Thus the fire is too long and narrow in strong wind. All results in the report use this code. The bug changes the ground-truth fire, and all planners fly the same fire. The report gives the effect.
-
 ## Data
 
 The repository contains the FEDS 2018 GeoPackage (`data/raw/`) and the weather and elevation for the tested fires (`data/cache/`). For another year, download it:
